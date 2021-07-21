@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version="20210709"
+version="20210721"
 
 #Script to extract information from whole sites
 #By Sébastien Clément, started 21/12/2011
@@ -265,6 +265,10 @@ no_network=1 # 1 = true (no network is available), 2 = false (network P and U dr
 	#20210709
 		#REQ_replacement_headers.txt is no longer needed, as replacement_headers.txt is dynamically created from REQ_data_types.txt.
 		
+	#20210721
+		#New version of uniformize_col_no.txt with the suffix parameter implemented
+		#Now temporary folder is stored in /dev/shm/
+		#Now gives the choice to continue even if tree mensurations of the same years already exist in the database. This choice was already available for coded observations, not for tree mensurations.
 
 #Dependencies:
 	#script_general_variables.txt 
@@ -354,7 +358,8 @@ fi
 	timestamp=$(date +%Y%m%d%H%M)
 	date_psql_format=$(date +%Y-%m-%d)
 	current_year=$(date +%Y)
-	temp_f="extract_whole_sites_temp"
+	#[NEW 20210721]
+	temp_f="/dev/shm/extract_whole_sites_temp_${timestamp}" # Now in RAM and with a timestamp tag at the end
 	germplasm_type='Arbre'	#Default germplasms.type value
 	
 	
@@ -1091,8 +1096,8 @@ orig_encoding=$(file -bi ${infilepath}|perl -pe 's/.+charset=(.+)/\1/g')
 	if [ -z $(echo $orig_encoding|grep -i 'utf-8') ] #if not utf-8
 	then
 		printf "\tConversion of ${infilepath} from ${orig_encoding} to UTF-8..."
-		iconv -f ${orig_encoding} -t utf-8 ${infilepath} > temp.txt
-		mv temp.txt ${outfilepath}
+		iconv -f ${orig_encoding} -t utf-8 ${infilepath} > ${temp_f}/temp.txt
+		mv ${temp_f}/temp.txt ${outfilepath}
 		printf "done.\n"
 	else
 		printf "\tNo need to convert ${infilepath} (already encoded in UTF-8)\n"
@@ -2017,8 +2022,8 @@ echo "-----------------------------"
 		dos2unix ${temp_f}/team_employees_per_date.txt
 		
 		#Join by date the user-modified file  and the original distinct_dates.txt file, and keep only columns 1 &2, to remove anything else
-		join -t $'\t' ${temp_f}/distinct_dates.txt ${temp_f}/team_employees_per_date.txt|cut -f1,2 > temp.txt
-		mv temp.txt ${temp_f}/team_employees_per_date.txt
+		join -t $'\t' ${temp_f}/distinct_dates.txt ${temp_f}/team_employees_per_date.txt|cut -f1,2 > ${temp_f}/temp.txt
+		mv ${temp_f}/temp.txt ${temp_f}/team_employees_per_date.txt
 		
 		#Test if user-modified file has anything else than 2 columns
 		if [ $(awk -F "\t" '{print NF}' ${temp_f}/team_employees_per_date.txt|sort -nu|head -1) -ne 2 ]
@@ -2209,8 +2214,9 @@ cat <(cut -f6 ${temp_f}/all_headers.txt |perl -pe 's/\n/\t/g'|perl -pe 's/\t$/\n
 	#(...)
 
 #d. uniformize column numbers. This is done because sometimes Excel doesn't count as a column an empty value in the last column.
-bash ${req_files_folder}/uniformize_col_no.txt ${temp_f}/cleaned_infile.txt 1 n temp.txt
-mv temp.txt ${temp_f}/cleaned_infile.txt
+#[NEW 20210721]: new version of uniformize_col_no.txt takes
+bash ${req_files_folder}/uniformize_col_no.txt ${temp_f}/cleaned_infile.txt 1 n ${temp_f}/temp.txt n ${timestamp}
+mv ${temp_f}/temp.txt ${temp_f}/cleaned_infile.txt
 
 
 
@@ -2798,7 +2804,7 @@ if [ $(cat ${temp_f}/file_and_db_common_obs_years.txt|wc -l) -gt 0 ]
 then
 	printf "${red_color}There already are coded observations data in TreeSource for the following year(s):\n"
 	perl -pe 's/^/\t/g' ${temp_f}/file_and_db_common_obs_years.txt
-	printf "Do you still want to try to import them to the database ? Note: any duplicate in coded observation for a given date will cause an error at insertion time.${normal_color}\n"
+	printf "Continue? Note: any duplicate in coded observation for a given date will cause an error at insertion time.${normal_color}\n"
 	already_imp_data_choice="-";while [ ! $(echo $already_imp_data_choice|grep '[Yn]') ];do printf "\r\t"; read -p "[Y/n]?" -n1 -s already_imp_data_choice;done;printf "\n"
 	if [ ${already_imp_data_choice} == "n" ];then printf "${red_color}\n***ABORTING***\n${normal_color}";exit;fi
 else
@@ -2812,11 +2818,11 @@ join -t $'\t' <(cut -f3 ${temp_f}/all_meas_fields.txt|awk -F "-" '{print $1}'|so
 
 if [ $(cat ${temp_f}/file_and_db_common_meas_years.txt|wc -l) -gt 0 ]
 then
-	printf "${red_color}There already are measurements data in TreeSource for the following year(s):\n"
+	printf "${red_color}There already are tree mensuration data in TreeSource for the following year(s):\n"
 	perl -pe 's/^/\t/g' ${temp_f}/file_and_db_common_meas_years.txt
-	printf "This would cause an error while trying to insert. Please review the $infile file and restart the script.${normal_color}\n"
-	printf "${red_color}\n***ABORTING***\n${normal_color}"
-	exit
+	printf "Continue? Note: any duplicate in tree mensurations for a year will cause an error at insertion time.${normal_color}\n"
+	already_imp_data_choice="-";while [ ! $(echo $already_imp_data_choice|grep '[Yn]') ];do printf "\r\t"; read -p "[Y/n]?" -n1 -s already_imp_data_choice;done;printf "\n"
+	if [ ${already_imp_data_choice} == "n" ];then printf "${red_color}\n***ABORTING***\n${normal_color}";exit;fi
 else
 	printf "Measurements: ok, all are new.\n"
 fi
@@ -4372,7 +4378,8 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 		
 		
 		#Uniformize column numbers, putting a NULL value where no measurements could be linked in the LEFT join
-		bash ${req_files_folder}/uniformize_col_no.txt ${temp_f}/temp_meas_base+meas.txt NULL FALSE ${temp_f}/meas_base+meas.txt
+		#[NEW 20210721]: new version of uniformize_col_no.txt with the suffix parameter
+		bash ${req_files_folder}/uniformize_col_no.txt ${temp_f}/temp_meas_base+meas.txt NULL FALSE ${temp_f}/meas_base+meas.txt n ${timestamp}
 		#exit 	#**********************************	
 	done
 
@@ -4709,7 +4716,7 @@ if [ ! -e ${final_folder} ]; then mkdir ${final_folder};fi
 mv ${temp_f}/team_employees_per_date.txt ${final_folder}				#Move file with team employees for each date
 mv ${temp_f} ${final_folder} 					#Move temp folder.
 mv ${ready2import_tabs_folder} ${final_folder} 			#Move final files folder
-#mv uniformize_temp ${final_folder}					#Move column number uniformization temp folder
+mv /dev/shm/uniformize_temp_${timestamp} ${final_folder}					#Move column number uniformization temp folder
 mv ${validation_temp_f} ${final_folder} 				#Move column validation temp folder
 cp ${infile} ${final_folder} 					#Move infile.
 cp -r ${req_files_folder} ${final_folder}				#Copy required files
