@@ -18,6 +18,7 @@ no_network=1 # 1 = true (no network is available), 2 = false (network P and U dr
 #**********TODO**********:
 	#Make the "disable_trigger" and "enable_trigger" functions standalone scripts
 	#ALSO: See "Modifications", 20130830
+	#[2021-12-10] Get the tree name from a column. See lines ~ 3343+
 #**************************:
 
 
@@ -269,6 +270,8 @@ no_network=1 # 1 = true (no network is available), 2 = false (network P and U dr
 		#New version of uniformize_col_no.txt with the suffix parameter implemented
 		#Now temporary folder is stored in /dev/shm/
 		#Now gives the choice to continue even if tree mensurations of the same years already exist in the database. This choice was already available for coded observations, not for tree mensurations.
+
+	
 
 #Dependencies:
 	#script_general_variables.txt 
@@ -3326,7 +3329,7 @@ fi
 
 
 
-
+exit
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3335,6 +3338,12 @@ fi
 echo
 echo "Calculating germplasm names:"
 echo "-----------------------------"
+
+
+#[NEW20211203]: calculate germplasm names only when no names were already provided
+##**************Ajouter un IF ici.
+
+
 
 #[NEW 2010707] Note: presence of required fields (e.g. BLOCK, FAMPROV, TREE, COMPARTMENT, etc.) to calculate the germplasm name based on the tree_name_format parameter has already been checked around line #2100
 #---> See required/optional columns in REQ_germplasm_name_fields.txt).
@@ -3556,6 +3565,19 @@ esac
 #exit
 
 
+
+
+
+
+#********C'est ici qu'on devra terminer le IF s'il existe une colonne de noms, car les étapes suivantes s'y appliqueront aussi. 
+
+
+
+
+
+
+
+
 printf "First 20 lines of calculated germplasm names:\n"
 head -20 ${temp_f}/germplasm_names.txt|perl -pe 's/^/\t/g'
 
@@ -3570,6 +3592,7 @@ then
 	printf "Please, correct the names in ${infile} (${temp_f}/infile_utf.txt)\n"
 	fnct_aborting
 fi
+
 
 #Add names to the cleaned file
 paste ${temp_f}/cleaned_infile2.txt ${temp_f}/germplasm_names.txt  > ${temp_f}/temp.txt
