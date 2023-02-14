@@ -1,42 +1,61 @@
 #!/bin/bash
 
-version="20210721"
-
+version="20230213"
+#--------------------------------------------------------------------------------------------------------------------
 #Script to extract information from whole sites
+#--------------------------------------------------------------------------------------------------------------------
 #By S�bastien Cl�ment, started 21/12/2011
 #Get from GitHub:
 #https://github.com/metaltree99/tree_mensuration/blob/main/script_extract_wholesite.txt
 
+
+#--------------------------------------------------------------------------------------------------------------------
+#Testing variables
+#--------------------------------------------------------------------------------------------------------------------
 create_tabs_despite_additional_data=0 #0=no, 1=yes. For test only. Will create tabulated files (turn additional_data to 0) for germplasms and germplasms_on_sites even if measurements and/or coded observations are already present in TreeSource (additional_data=1).
 skip="no" # yes, no: skip most of the script. Look for SKIP_TAG below.
 
 test=2 #Test mode: 1. yes 2. no
 #	If in test mode, stops after 10 analyzed columns for validation, and displays more progress details on screen.
-no_network=1 # 1 = true (no network is available), 2 = false (network P and U drives are available)
 
-
-#**********TODO**********:
-	#Make the "disable_trigger" and "enable_trigger" functions standalone scripts
-	#ALSO: See "Modifications", 20130830
-	#[2021-12-10] Get the tree name from a column. See lines ~ 3343+
-#**************************:
-
-
+#--------------------------------------------------------------------------------------------------------------------
 #Usage:
-	#bash script_extract_wholesite.txt sitefile 
+#--------------------------------------------------------------------------------------------------------------------
+#bash script_extract_wholesite.txt sitefile 
 	
-	#1. sitefile [REQUIRED]: the file containing site info
-		#See sheet "Markers_for_wholesites_imports" of file ADDED.xls for required info in that file.
+#1. sitefile [REQUIRED]: the file containing site info
+	#See sheet "Markers_for_wholesites_imports" of file ADDED.xls for required info in that file.
+
+#The script automatically detects if it is run from the s-que-vdq100156 Linux server.
+#	If that's the case, the required files are looked for in: 		/home/team/shared_scripts/REQs_script_extract_wholesite/
+#	Otherwise, required files are looked for in: 			./REQs_script_extract_wholesite/
+
+#--------------------------------------------------------------------------------------------------------------------
+#Extracted reference files (as of 2023-02-09)
+#--------------------------------------------------------------------------------------------------------------------
+#The script extracts on the fly certains views from TreeSource and puts them in  the REQs_script_extract_wholesite folder (see above).
+#	all_sites.txt 
+#	all_organisms.txt
+#	all_germplasm_names.txt
+#	all_data_source_ids.txt 
+#	obs_codes.txt 
+#The above files have the exact same name and SQL SELECT definition as those in /home/team/exported_views/ folder.
+#The reason why we don't simply use these latter files is that they are extracted only once a day at 23h00 by script_extract_views.txt, and hence may not be up-to-date.
+#One option would be have that script automatically run by the current script to update the files, so that only one set of files could exist, in one single folder.
+#However, since the current script is not always run by seclemen, who is the only one to have execution rights for rhe other scripts, it would fail for other users.
 
 
-#For testing with ts_d
-#	DELETE from coded_observations_on_germplasms where ri_date >= '2015-01-23';
-#	DELETE from tree_mensurations where ri_date >= '2015-01-23';
-#	DELETE from observations_on_sites where ri_date >= '2015-01-23';
-#	DELETE from observation_codes where ri_date >= '2015-01-23';
+#--------------------------------------------------------------------------------------------------------------------
+#**********TODO**********:
+#--------------------------------------------------------------------------------------------------------------------
+#Make the "disable_trigger" and "enable_trigger" functions standalone scripts
 
+
+
+#--------------------------------------------------------------------------------------------------------------------
 #Modifications:
-	#20120118: 	minor correction when SEQUENCE column is <> 0
+#--------------------------------------------------------------------------------------------------------------------
+#20120118: 	minor correction when SEQUENCE column is <> 0
 	# 		added formatting into final utf8 files (step 13)
 	#20120119: 	improved final files handling (naming)
 	#		added uniformization of col number right after file cleaning to prevent some "Excel-last-column-sometimes-empty-sometimes-not"-related errors
@@ -271,16 +290,63 @@ no_network=1 # 1 = true (no network is available), 2 = false (network P and U dr
 		#Now temporary folder is stored in /dev/shm/
 		#Now gives the choice to continue even if tree mensurations of the same years already exist in the database. This choice was already available for coded observations, not for tree mensurations.
 
+	#20230206-10
+		#xtraksites132.156.208.30.tx	---> xtraksites132.156.208.78.tx
+		#
+		#[ ] --> [[ ]] for all string comparisons (e.g. if [[ $abc == "toto" ]] )
+		#
+		#New tree name format supported: S_B_F_T
+		#
+		#no_network: no longer used. Instead, the script automatically looks if it is run from the s-que-vdq100156 Linux server.
+		#	If yes, will use the required files from /home/team/shared_scripts/REQs_script_extract_wholesite/
+		#	If no, will use then from ./REQs_script_extract_wholesite/
+		#
+		#cwfc_server_IP_address ---> db_server_address
+		#
+		#script_general_variables.txt: no longer used
+		#
+		#The following lists are extracted at each run from TreeSource and put into the REQs_script_extract_wholesite folder:
+		#	all_sites.txt (formerly TreeSource_sites_code_and_plantation_dates_and_years.txt)
+		#	all_organisms.txt
+		#	all_germplasm_names.txt
+		#	all_data_source_ids.txt (formerly TreeSource_data_source_ids.txt)
+		#	obs_codes.txt (formerly TreeSource_all_obs_codes_and_descriptions.txt)
+		#	Note that the SQL views definitions for those 5 files are exactly the same as those in /home/seclemen/scripts/ref_files/views_to_extract.txt
+		#		...and the files are identical in name and contents between those 2 folders.
+		#
+		#The calculated germplasm names (germplasm_names.txt) are no longer added to cleaned_infile2.txt.
+		#	They are instead ket in this separated file which makes them easier to work with.
+		#	They now can contain germplasm_id's as well as names, when trees are already existing in the database ($additional_data=1), as verified by extracted lists TreeSource_coded_observation_years_${site_code}.txt  and TreeSource_measurement_years_${site_code}.txt.
+		#
+		#Corrected alternative names generation.
+		#	The alternative names come along with a germplasm_id when trees already exist in TreeSource (germplasm_names doesn't have a temp_germplasm_name field).
+		#	Duplicated names with the same description for any single tree are discarded.
+
+	#2023-02-13
+		#Now uses "context_id" instead of "context" to prepare files to insert into comments_on_germplasms, to refelect the changes in structure of the latter.
+		#
+		#Corrected a wrong ordering problem when getting the germplasm_id's from the names existing in TreeSource.
+
+#--------------------------------------------------------------------------------------------------------------------
+#Dependencies:
+#--------------------------------------------------------------------------------------------------------------------
+	#1. Required files that must be in the folder described below:
+	#	REQ_aberrant_meas_messages_utf.txt
+	#	REQ_data_types.txt
+	#	REQ_filler_tree_famprovs.txt
+	#	REQ_final_tabs_creation_parameters.txt
+	#	etc.
+	#	
+	#	a) If run from s-que-vdq100156 Linux server:
+	#		/home/team/shared_scripts/REQs_script_extract_wholesite
+	#
+	#	b) If run from anywhere else:
+	#		./REQs_script_extract_wholesite
 	
 
-#Dependencies:
-	#script_general_variables.txt 
-	#	location for administrator: 		P:/000_scripts/
-	#	location for other users: 		U:/Centre_Fibre/NationalWoodFibreAttributesDatabase/Partage/scripts/
-	#Required files in the following folder: 
-	#	U:\Centre_Fibre\NationalWoodFibreAttributesDatabase\Partage\scripts\ref_files\REQs_script_extract_wholesite
-
+#--------------------------------------------------------------------------------------------------------------------
 #Required database privileges for the xtraksites user
+#--------------------------------------------------------------------------------------------------------------------
 	#OBJECT						Privileges				Added	Required for
 	#coded_observations_on_germplasms*		INSERT,SELECT
 	#comments_on_germplasms*			INSERT,SELECT
@@ -303,59 +369,84 @@ no_network=1 # 1 = true (no network is available), 2 = false (network P and U dr
 	#	*Previously, UPDATE was required to clear the temp_germplasm_name by the trigger procedure in these tables. No longer needed (23/1/2015), as this action is no longer done immediately, but rather by the function fnct_clear_temp_fields(), executed every night by postgres, through bash script script_run_modifying_sql_scripts_daily.txt and SQL script SQL_PhenoTree_01_execute_functions.sql.
 
 
-#Variables that will change depending on if network is available:
-#Added: 13/7/2016
-#1 = no network available. 2= network P and U drives available.
-if [ ${no_network} -eq 1 ] #No network available/used.
-then
 
-	echo "NOTE: No network used!"
-	echo "Make sure that the following folder from U:/Centre_Fibre/000_TreeSource/Partage/scripts/ref_files/ is copied to the current folder:"
-	printf "\tREQs_script_extract_wholesite\n"
+#--------------------------------------------------------------------------------------------------------------------
+#Variables definition
+#--------------------------------------------------------------------------------------------------------------------
+#Column skipping character
+skip_char="-"
+
+#Change internal field separator
+old_ifs=$IFS
+IFS='
+'
+
+#Colors
+red_color="\033[1;31m"
+green_color="\033[1;32m"
+blue_color="\033[1;34m"
+normal_color="\033[0m"
+
+#Linux server variables
+db_server_address="132.156.208.78"
+linux_server_name="s-que-vdq100156"	#Name of the Linux server used for running the script
+req_files_linux_server="/home/team/shared_scripts/REQs_script_extract_wholesite" #Location of required files on that server
+
+#exported_views_linux_server="/home/team/exported_views" 	#Location of exported views on that server
+
+
+#[NEW 2023-02-07]
+#Test if running locally or on Linux s-que-vdq100156 server
+#
+#Running from Linux server (note: it is assumed that the /home/seclemen/ folder is NOT accessible, as the current script might be run by anybody.
+if [ $(uname -n|grep -i ${linux_server_name}|wc -l) -eq 1 ];
+then 
+	echo "Running from ${linux_server_name}"
+	echo "Will use files in ${req_files_linux_server}/"
 	
-	#General variables replaced by script-specific variables for local use only.
-		#exported_tables_path_shared: not used if local.
-		cwfc_server_IP_address="132.156.208.30"
-		#ref_files_path_shared: not used if local.
-		#scripts_path_shared: not used if local.
-		req_files_folder="./REQs_script_extract_wholesite"
-		all_species_filepath="${req_files_folder}/all_organisms.txt" #NOTE: will be extracted by the current script, so no need to put it in required files.
-	echo "NOTE: if any of the local files in ${req_files_folder} are modified, please copy them back to U:/Centre_Fibre/000_TreeSource/Partage/scripts/ref_files/REQs_script_extract_wholesite."
+	req_files_folder="${req_files_linux_server}"
+	
+	#These files may not be up-to-date, because they were extracted the day before at 23h00.
+	#Unless the user running the current script is seclemen and can run script_extract_views.txt, it is better to re-extract those files directly in the script below.
+	#The lines below are thus ignored:
+	#	Copy them to /home/team/shared_scripts/REQs_script_extract_wholesite/	<---$req_files_folder <--- $req_files_linux_server
+	#	cp ${exported_views_linux_server}/all_organisms.txt ${req_files_folder}
+	#	cp ${exported_views_linux_server}/all_germplasm_names.txt ${req_files_folder}
+	#	cp ${exported_views_linux_server}/all_sites.txt ${req_files_folder}
+	#	cp ${exported_views_linux_server}/all_data_source_ids.txt ${req_files_folder}
+	#	cp ${exported_views_linux_server}/obs_codes.txt ${req_files_folder}
 
-else #Network is available
+else 
+	echo "NOT running from ${linux_server_name}"
+	echo "Will use files in ./REQs_script_extract_wholesite/"
+	
+	req_files_folder="./REQs_script_extract_wholesite"
+	
+	#If ./REQs_script_extract_wholesite doesn't exist, warn and exit!
+	if [ ! -e ./${req_files_folder} ]
+	then 
+		printf "${red_color}No ${req_files_folder} folder found!\nPlease create the folder and put all required files within it.\nSCRIPT ABORTED${normal_color}\n\n"
+		exit
+	
+	fi
+	
+	#NOTE: the two following files will be extracted to ${req_files_folder by the current script:
+	#	all_data_source_ids.txt
+	#	all_germplasm_names.txt
+	#	all_organisms.txt"
+	#	all_sites.txt
+	#	obs_codes.txt
+	
+	echo "NOTE: if any of the local files in ${req_files_folder} are updated, please copy them back to s-que-vdq100156:/home/team/shared_scripts/REQs_script_extract_wholesite/"
 
-	#LOCAL file specifying absolute paths to the P and U, and executing script_general_variables.txt, located on either the P (admin) or U (other users).
-	#Note: the file below is different between the admin (seclemen) and the regular users, as is the script_general_variables.txt (more complete, on the P, for admin, shortened, on the U, for regular users).
-	pathfile="${HOME}/local_network_paths.txt"
-
-	#General variables:
-		#Read local network paths & general variables:
-		dos2unix ${pathfile} 2> /dev/null
-		. ${pathfile}
-
-		#General variables used below:
-			#${exported_tables_path_shared}	Typically= U:/Centre_Fibre/000_TreeSource/Partage/scripts/extracted_lists
-			#${cwfc_server_IP_address}		Typically= 132.156.208.30
-			#${ref_files_path_shared}		Typically= U:/Centre_Fibre/000_TreeSource/Partage/scripts/ref_files
-			#${scripts_path_shared}			Typically= U:/Centre_Fibre/000_TreeSource/Partage/scripts
-
-
-		#This script specific variables
-			#This will be used to extract and insert codes in observation_codes
-			req_files_folder=${ref_files_path_shared}/REQs_script_extract_wholesite
-
-			#Path to the up-to-date extracted list of organisms. Used to convert abbreviated names of the SPECIES column into organisms.id values
-			#NOTE: change this path and/or provide the all_organisms.txt file when running the script on a machine that cannot readily access the U disk using the same path (e.g. Biolinux server)
-			all_species_filepath=${exported_tables_path_shared}/all_organisms.txt
-		
 fi
 
 
 
 #This script specific variables
 	#This will be used to extract and insert codes in observatioon_codes
-		PGPASSWORD=$(cat ${req_files_folder}/xtraksites132.156.208.30.txt)
-		PGHOST=${cwfc_server_IP_address}
+		PGPASSWORD=$(cat ${req_files_folder}/xtraksites132.156.208.78.txt)
+		PGHOST=${db_server_address}
 		PGUSER="xtraksites"
 		export PGUSER PGPASSWORD PGHOST
 	timestamp=$(date +%Y%m%d%H%M)
@@ -364,6 +455,7 @@ fi
 	#[NEW 20210721]
 	temp_f="/dev/shm/extract_whole_sites_temp_${timestamp}" # Now in RAM and with a timestamp tag at the end
 	germplasm_type='Arbre'	#Default germplasms.type value
+	
 	
 	
 	#File with default site parameters
@@ -412,30 +504,16 @@ required_files=(
 	#${req_files_folder}/script_insert_wholesite.txt No longer needed (10/2/2015)
 	${req_files_folder}/SQL_count_records.txt
 	${req_files_folder}/SQL_extract_data_for_validation.txt
-	${req_files_folder}/SQL_extract_observation_codes.txt
+	#${req_files_folder}/SQL_extract_observation_codes.txt
 	${req_files_folder}/SQL_OTHER_COMMANDS_EXAMPLE.txt
 	${req_files_folder}/uniformize_col_no.txt
 	${req_files_folder}/validate_column.txt
 	${req_files_folder}/validate_columns_doc.txt
-	${req_files_folder}/xtraksites132.156.208.30.txt
+	${req_files_folder}/xtraksites132.156.208.78.txt
 	)
 
 #exit
 
-
-#Column skipping character
-skip_char="-"
-
-#Change internal field separator
-old_ifs=$IFS
-IFS='
-'
-
-#Colors
-red_color="\033[1;31m"
-green_color="\033[1;32m"
-blue_color="\033[1;34m"
-normal_color="\033[0m"
 
 #Reject observations when tree status abnormal (e.g. dead/cut/unknown filler tree)
 #	For CFS: coded observations would be rejected when E <> 1
@@ -733,8 +811,9 @@ function fnct_clean_FMQTRT_files {
 
 				#Create the observation type-specific SQL script
 				#Line before 30/8/2013: awk -F "\t" '{print "\tINSERT INTO comments_on_germplasms(germplasm_name,date,date_is_approximate,comment,context,team_code,data_source_id) SELECT '\''"$3"'\'',now(),FALSE,'\''Attention: une observation "$2" ('\''||(SELECT description FROM observation_codes WHERE code='\''"$2"'\'')||'\'') a été faite le "$6", en dépit d'\'''\''un statut "$1" ('\''||(SELECT description FROM observation_codes WHERE code='\''"$1"'\'')||'\''). Cette observation n'\'''\''a pas été intégrée à la base de données.'\'','\''Erreur des données'\'','\''S�bastien Cl�ment'\'',"$9";"}' ${temp_f}/saved_error_SQL_script_temp2.txt|cat <(echo "--Errors for ${obs_type} observation codes:") - > ${temp_f}/SQL_insert_saved_errors_${obs_type}.txt
-				#***TEAMCODE_ok_20150107***
-				awk -F "\t" '{print "\tINSERT INTO comments_on_germplasms(germplasm_id,date,date_is_approximate,comment,context,team_id,data_source_id) SELECT fnct_get_germplasm_id_from_refname('\''"$3"'\''),now(),FALSE,'\''Attention: une observation "$2" ('\''||(SELECT description FROM observation_codes WHERE code='\''"$2"'\'')||'\'') a été faite le "$6", en dépit d'\'''\''un statut "$1" ('\''||(SELECT description FROM observation_codes WHERE code='\''"$1"'\'')||'\''). Cette observation n'\'''\''a pas été intégrée à la base de données.'\'','\''Erreur des données'\'',fnct_get_team_from_employees('\''Sébastien Clément'\''),"$9";"}' ${temp_f}/saved_error_SQL_script_temp2.txt|cat <(echo "--Errors for ${obs_type} observation codes:") - > ${temp_f}/SQL_insert_saved_errors_${obs_type}.txt
+				
+				#Line before 2023-02-13: awk -F "\t" '{print "\tINSERT INTO comments_on_germplasms(germplasm_id,date,date_is_approximate,comment,context,team_id,data_source_id) SELECT fnct_get_germplasm_id_from_refname('\''"$3"'\''),now(),FALSE,'\''Attention: une observation "$2" ('\''||(SELECT description FROM observation_codes WHERE code='\''"$2"'\'')||'\'') a été faite le "$6", en dépit d'\'''\''un statut "$1" ('\''||(SELECT description FROM observation_codes WHERE code='\''"$1"'\'')||'\''). Cette observation n'\'''\''a pas été intégrée à la base de données.'\'','\''Erreur des données'\'',fnct_get_team_from_employees('\''Sébastien Clément'\''),"$9";"}' ${temp_f}/saved_error_SQL_script_temp2.txt|cat <(echo "--Errors for ${obs_type} observation codes:") - > ${temp_f}/SQL_insert_saved_errors_${obs_type}.txt
+				awk -F "\t" '{print "\tINSERT INTO comments_on_germplasms(germplasm_id,date,date_is_approximate,comment,context_id,team_id,data_source_id) SELECT fnct_get_germplasm_id_from_refname('\''"$3"'\''),now(),FALSE,'\''Attention: une observation "$2" ('\''||(SELECT description FROM observation_codes WHERE code='\''"$2"'\'')||'\'') a été faite le "$6", en dépit d'\'''\''un statut "$1" ('\''||(SELECT description FROM observation_codes WHERE code='\''"$1"'\'')||'\''). Cette observation n'\'''\''a pas été intégrée à la base de données.'\'',(SELECT id FROM contexts_for_comments_on_germplasms WHERE description_en='\''Data error'\''),fnct_get_team_from_employees('\''Sébastien Clément'\''),"$9";"}' ${temp_f}/saved_error_SQL_script_temp2.txt|cat <(echo "--Errors for ${obs_type} observation codes:") - > ${temp_f}/SQL_insert_saved_errors_${obs_type}.txt
 			
 			fi
 
@@ -862,7 +941,7 @@ esac
 	echo
 	printf "${blue_color}PLEASE check the SQL scripts under '${ready2import_tabs_folder}' and make any necessary corrections (diacritics, incomplete data, etc.).\n\tWhen done press 'y'. To abort script press 'n'.\n${normal_color}"
 	sql_check_choice="-";while [ ! $(echo $sql_check_choice|grep '[Yn]') ];do printf "\r\t"; read -p "[Y/n]?" -n1 -s sql_check_choice;done;printf "\n"
-	if [ ${sql_check_choice} == "n" ];then printf "${red_color}\n***ABORTING***\n${normal_color}";exit;fi
+	if [[ ${sql_check_choice} == "n" ]];then printf "${red_color}\n***ABORTING***\n${normal_color}";exit;fi
 	
 	#Convert SQL files encoding to utf-8 when necessary
 	#Check file encoding for the SQL scripts
@@ -908,7 +987,7 @@ esac
 			printf "${red_color}PLEASE, check the file '${temp_f}/SQL_insert_and_update1_run_log.txt' and press 'y' to ignore the error and continue or 'n' to abort.\n${normal_color}"
 			
 			choice="-";while [ ! $(echo $choice|grep '[yn]') ];do printf "\r\t"; read -p "[y/n]?" -n1 -s choice;done;printf "\n"
-			if [ ${choice} == "n" ];then printf "${red_color}\n***ABORTING***\n${normal_color}";exit
+			if [[ ${choice} == "n" ]];then printf "${red_color}\n***ABORTING***\n${normal_color}";exit
 			fi
 		fi
 	printf "ok!\n"
@@ -954,7 +1033,7 @@ esac
 			printf "${red_color}PLEASE, check the file '${temp_f}/SQL_insert_and_update2_run_log.txt' and press 'y' to ignore the error and continue or 'n' to abort.\n${normal_color}"
 			
 			choice="-";while [ ! $(echo $choice|grep '[yn]') ];do printf "\r\t"; read -p "[y/n]?" -n1 -s choice;done;printf "\n"
-			if [ ${choice} == "n" ]
+			if [[ ${choice} == "n" ]]
 			then
 				printf "${red_color}\n***ABORTING***\n${normal_color}"
 				exit
@@ -976,7 +1055,7 @@ esac
 			printf "${red_color}PLEASE, check the file '${temp_f}/SQL_insert_and_update3_run_log.txt' and press 'y' to ignore the error and continue or 'n' to abort.\n${normal_color}"
 			
 			choice="-";while [ ! $(echo $choice|grep '[yn]') ];do printf "\r\t"; read -p "[y/n]?" -n1 -s choice;done;printf "\n"
-			if [ ${choice} == "n" ]
+			if [[ ${choice} == "n" ]]
 			then
 				printf "${red_color}\n***ABORTING***\n${normal_color}"
 				exit
@@ -990,7 +1069,8 @@ esac
 	
 	#Calculate stats after
 	printf "\n\tCalculating stats after insertion..."
-	psql -d ${database_name} -A -F "___" -t -f "extract_whole_sites_temp/SQL_count_records.txt" |perl -pe 's/___/\t/g' > ${temp_f}/records_count_after_insertion.txt
+	#Line before 2023-02-13: psql -d ${database_name} -A -F "___" -t -f "extract_whole_sites_temp/SQL_count_records.txt" |perl -pe 's/___/\t/g' > ${temp_f}/records_count_after_insertion.txt
+	psql -d ${database_name} -A -F "___" -t -f "${temp_f}/SQL_count_records.txt" |perl -pe 's/___/\t/g' > ${temp_f}/records_count_after_insertion.txt
 	dos2unix ${temp_f}/records_count_after_insertion.txt 2> /dev/null
 	printf "done.\n"
 	
@@ -1011,7 +1091,7 @@ esac
 		printf "Press \"y\" when comparison is done, or \"n\" to abort the script\n"
 		choice="-";while [ ! $(echo $choice|grep '[yn]') ];do printf "\r\t"; read -p " [y/n]?" -n1 -s choice;done;printf "\n"
 
-		if [ ${choice} == "n" ]
+		if [[ ${choice} == "n" ]]
 		then
 			printf "${red_color}\n***ABORTING***\n${normal_color}"
 			exit
@@ -1105,7 +1185,7 @@ orig_encoding=$(file -bi ${infilepath}|perl -pe 's/.+charset=(.+)/\1/g')
 	else
 		printf "\tNo need to convert ${infilepath} (already encoded in UTF-8)\n"
 		#Even without conversion, copy towards the outfilepath, if it is different from the infilepath
-		if [ ${infilepath} != ${outfilepath} ]
+		if [[ ${infilepath} != ${outfilepath} ]]
 		then
 			cp ${infilepath} ${outfilepath}
 		fi
@@ -1196,7 +1276,7 @@ then
 	printf "${blue_color}${parameter_value}${normal_color}..."
 
 	#If a date, check if correctly formatted
-	if [ ${param_data_type} == "date" ] && [ -z $(echo ${parameter_value}|grep -E '^[[:digit:]]{4}-[[:digit:]]{2}-[[:digit:]]{2}$') ]
+	if [[ ${param_data_type} == "date" ]] && [ -z $(echo ${parameter_value}|grep -E '^[[:digit:]]{4}-[[:digit:]]{2}-[[:digit:]]{2}$') ]
 	then
 		printf "bad data type!\t" >> ${param_jfile}
 		printf "\n\t\t${red_color}The parameter \"${param_name}\" MUST BE FORMATTED AS A DATE (YYYY-MM-DD)!\n\t\tACTUAL VALUE \"${parameter_value}\" IS INCORRECT.${normal_color}\n"
@@ -1204,7 +1284,7 @@ then
 	fi
 
 	#If an integer, check if correctly formatted
-	if [ ${param_data_type} == "integer" ] 
+	if [[ ${param_data_type} == "integer" ]]
 	then
 	
 		#Check if an integer
@@ -1224,7 +1304,7 @@ then
 	fi
 
 	#If a boolean, check if correctly formatted
-	if [ ${param_data_type} == "boolean" ] && [ -z $(echo ${parameter_value}|grep -Ei '^TRUE$|^FALSE$|^NULL$') ]
+	if [[ ${param_data_type} == "boolean" ]] && [ -z $(echo ${parameter_value}|grep -Ei '^TRUE$|^FALSE$|^NULL$') ]
 	then
 		printf "bad data type!" >> ${param_jfile}
 		printf "\n\t\t${red_color}The parameter \"${param_name}\" MUST BE A BOOLEAN (TRUE/FALSE/NULL)!\n\t\tACTUAL VALUE \"${parameter_value}\" IS INCORRECT.${normal_color}\n"
@@ -1232,7 +1312,7 @@ then
 	fi
 
 	#If a numeric, check if correctly formatted
-	if [ ${param_data_type} == "numeric" ] && [ -z $(echo ${parameter_value}|grep -E '^[[:digit:]]+\.?[[:digit:]]*$') ]
+	if [[ ${param_data_type} == "numeric" ]] && [ -z $(echo ${parameter_value}|grep -E '^[[:digit:]]+\.?[[:digit:]]*$') ]
 	then
 		printf "bad data type!" >> ${param_jfile}
 		printf "\n\t\t${red_color}The parameter \"${param_name}\" MUST BE NUMERIC!\n\t\tACTUAL VALUE \"${parameter_value}\" IS INCORRECT.${normal_color}\n"
@@ -1280,7 +1360,7 @@ function fnct_clean_filler_tree_famprovs {
 ################################SKIP_TAG##############################
 ####################################################################
 #THIS IS THE START OF THE CODE TO BE SKIPPED, IF skip=="yes"
-if [ ${skip} == "no" ]
+if [[ ${skip} == "no" ]]
 then
 ####################################################################
 ####################################################################
@@ -1330,12 +1410,12 @@ printf "done.\n"
 
 #Make a copy of critical (those to which lines are regularly added) required files on the P
 #Note: other can be found in P:\000_scripts\UNIX\EXTRACT_WHOLESITES\REQs_script_extract_wholesite20150114
-if [ ${no_network} -eq 2 ] #13/7/2016: only if network is available.
-then
-	cp -f ${req_files_folder}/REQ_filler_tree_famprovs.txt ${scripts_path_shared}/bkps/REQ_filler_tree_famprovs_$(date +%Y%m%d)_bkp.txt
-	cp -f ${req_files_folder}/REQ_site-specific_values_substitution_utf.txt ${scripts_path_shared}/bkps/REQ_site-specific_values_substitution_$(date +%Y%m%d)_bkp.txt
-	cp -f ${req_files_folder}/REQ_values_to_remove.txt ${scripts_path_shared}/bkps/REQ_values_to_remove_$(date +%Y%m%d)_bkp.txt
-fi
+#if [ ${no_nrcan_network} -eq 2 ] #13/7/2016: only if network is available.
+#then
+#	cp -f ${req_files_folder}/REQ_filler_tree_famprovs.txt ${scripts_path_shared}/bkps/REQ_filler_tree_famprovs_$(date +%Y%m%d)_bkp.txt
+#	cp -f ${req_files_folder}/REQ_site-specific_values_substitution_utf.txt ${scripts_path_shared}/bkps/REQ_site-specific_values_substitution_$(date +%Y%m%d)_bkp.txt
+#	cp -f ${req_files_folder}/REQ_values_to_remove.txt ${scripts_path_shared}/bkps/REQ_values_to_remove_$(date +%Y%m%d)_bkp.txt
+#fi
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------
 #3. Script parameters
@@ -1362,48 +1442,67 @@ printf "done.\n"
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------
 #4. Create reference files
-#	Note: 
-#	Some reference files require informations (e.g. site_code) from parameters, and are thus extracted after or in section 4.
-#		
-#	Some other reference files ARE required for section 4:
-#		${temp_f}/TreeSource_sites_code_and_plantation_dates_and_years.txt
-#		${temp_f}/TreeSource_data_source_ids.txt
 #------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+#Extract fresh files from the database, even if running from the Linus server...
+#	... as the files in /home/team/exported_views/ may not be up-to-date. That's why we extract them here.
+#Note: the SELECTs below have the exact same definitions as those in /home/seclemen/scripts/ref_files/views_to_extract.txt and which go into /home/team/exported_views/
+
 printf "Extracting reference files from the database..."
 
+#Extract all organisms from TreeSource. Will be used when a species column is present in Excel file.
+psql -d ts_pi -A -t -F "___" -c "SELECT * FROM organisms ORDER BY name" |iconv -f utf-8 -t iso-8859-1//IGNORE|perl -pe 's/___/\t/g' > ${req_files_folder}/all_organisms.txt
+dos2unix ${req_files_folder}/all_organisms.txt 2> /dev/null
 
-#[NEW! 27/2/2015]: Extract all organisms from TreeSource, because an up-to-date version might be needed if a SPECIES column is present. 
-	psql -d ts_pi -A -t -F "___" -c "SELECT * FROM organisms ORDER BY name" |iconv -f utf-8 -t iso-8859-1//IGNORE|perl -pe 's/___/\t/g' > ${all_species_filepath}
-	dos2unix ${all_species_filepath} 2> /dev/null
+#Extract the list of sites (code and establishment_year). Will be used to verify if provided site code in Excel file exists, and if the site codes in REQ_site-specific_values_substitution_utf.txt are also valid.
+psql -d ts_pi -A -t -F "___" -c "select code, plantation_establishment_date_from,plantation_establishment_date_to,establishment_year,location, province_state, country,lat_dec, long_dec, geo_location_code FROM sites where code NOT LIKE '(%' order by code" |perl -pe 's/___/\t/g' > ${req_files_folder}/all_sites.txt
+dos2unix ${req_files_folder}/all_sites.txt 2> /dev/null
 
-#Create files from existing required (REQ) files
-	#REQ_obs_codes_other_than_tree_status.txt
-		grep -vE '^#|^$' ${req_files_folder}/REQ_data_types.txt |awk -F "\t" '{if ($14 == "obs_code" && $15 != "1") print $1}'|sort -u > ${req_files_folder}/REQ_obs_codes_other_than_tree_status.txt
-
-
-#Extract list of observation codes from TreeSource (30/8/2013: replaced with the line below)
-	#psql -d ts_pi -A -t -c "SELECT code FROM observation_codes ORDER BY 1" > ${temp_f}/TreeSource_all_obs_codes.txt
-	#dos2unix ${temp_f}/TreeSource_all_obs_codes.txt 2>/dev/null
-
-
-#Extract all observation codes (prefixes, values, full code, description) from TreeSource
-	psql -d ts_pi -A -t -F "___" -f "${req_files_folder}/SQL_extract_observation_codes.txt" |perl -pe 's/___/\t/g' > ${temp_f}/TreeSource_all_obs_codes_and_descriptions.txt
-	dos2unix ${temp_f}/TreeSource_all_obs_codes_and_descriptions.txt 2> /dev/null
-
-#Extract only the codes from the previous list
-	cut -f4 ${temp_f}/TreeSource_all_obs_codes_and_descriptions.txt|sort > ${temp_f}/TreeSource_all_obs_codes_only.txt
-
-#From the previous list, keep only those that are going to be used in Excel files coming from field work.
-	awk -F "\t" '{if ($5 == "t") print $1"\t"$3"\t"$4"\t"$6}' ${temp_f}/TreeSource_all_obs_codes_and_descriptions.txt |sort -t $'\t' -k1,1 -k2,2 |cat ${req_files_folder}/REQ_obs_codes_conv_table2_header.txt - > ${req_files_folder}/REQ_obs_codes_conv_table2_sel_codes.txt
-
-
-#Extract the list of sites (code and establishment_year)
-	psql -d ts_pi -A -t -F "___" -c "select code,plantation_establishment_date_from,plantation_establishment_date_to,establishment_year from sites where code NOT LIKE '(%' order by code" |perl -pe 's/___/\t/g' > ${temp_f}/TreeSource_sites_code_and_plantation_dates_and_years.txt
-	dos2unix ${temp_f}/TreeSource_sites_code_and_plantation_dates_and_years.txt 2> /dev/null
+#Extract the germplasm names. These will be used for validating the names created at section 22
+psql -d ts_pi -A -t -F "___" -c "select name,germplasm_id,description,is_reference_name from germplasm_names ORDER BY 1" |perl -pe 's/___/\t/g' > ${req_files_folder}/all_germplasm_names.txt
+dos2unix ${req_files_folder}/all_germplasm_names.txt 2> /dev/null
 
 #Extract the list of data_source_id's
-	psql -d ts_pi -A -t -c "select id FROM data_sources ORDER BY 1" > ${temp_f}/TreeSource_data_source_ids.txt
-	dos2unix ${temp_f}/TreeSource_data_source_ids.txt 2> /dev/null
+#Line before 2023-02-07: psql -d ts_pi -A -t -c "select id FROM data_sources ORDER BY 1" > ${temp_f}/TreeSource_data_source_ids.txt
+psql -d ts_pi -A -t -F "___" -c "SELECT * FROM data_sources ORDER BY 1"|perl -pe 's/___/\t/g' > ${req_files_folder}/all_data_source_ids.txt
+dos2unix ${req_files_folder}/all_data_source_ids.txt 2> /dev/null
+
+#Extract all observation codes (prefixes, values, full code, description) from TreeSource
+#2023-02-07: ${req_files_folder}/SQL_extract_observation_codes.txt no longer required, since the full SELECT is provided below.
+#Line before 2023-02-07: psql -d ts_pi -A -t -F "___" -f "${req_files_folder}/SQL_extract_observation_codes.txt" |perl -pe 's/___/\t/g' > ${req_files_folder}/obs_codes.txt
+#Details:
+#1. regexp_replace(code,'^([A-Za-z]+)_?(.+)','\1','g') : extracts the beginning of the code (category), which is made of one or several consecutive letters such as D,E,F,QcD,QcMngb,QT, etc.
+#2. regexp_replace(code,'^([A-Za-z]+)_?(.+)','\2','g') : extracts the remainder of the code (subcategory), which is either numeric, alpha, or a mix of both, for example: 01, 05D, 7, 06B+, AH2, A, etc.
+##	Note: The two parts are often separated by an underscore.
+#3. regexp_replace(regexp_replace(code,'^([A-Za-z]+)_?(.+)','\2','g'),'^0+([^0])','\1','g') : identical to 2, but for the leading 0's that are removed.
+#4. code ~ '^D_|^E\d\d|^F_|^MAR_|^Qc[A-Za-z]+_|^QT_|^RT_' : returns true if the code starts with any of the parts listed in the regular expression.
+#	This is used to identify only those codes that are used for importing data from Excel files using script_extract_wholesites*.txt.
+psql -d ts_pi -A -t -F "___" -c "SELECT regexp_replace(code,'^([A-Za-z]+)_?(.+)','\1','g') AS code_category, regexp_replace(code,'^([A-Za-z]+)_?(.+)','\2','g') AS code_subcategory, regexp_replace(regexp_replace(code,'^([A-Za-z]+)_?(.+)','\2','g'),'^0+([^0])','\1','g') AS code_subcategory_noleading0s, code, code ~ '^D_|^E\d\d|^F_|^MAR_|^Qc[A-Za-z]+_|^QT_|^RT_' AS for_import_site_script, description_fr FROM observation_codes ORDER BY 1,2" |perl -pe 's/___/\t/g' > ${req_files_folder}/obs_codes.txt
+dos2unix ${req_files_folder}/obs_codes.txt 2> /dev/null
+
+printf "done.\n\n"
+
+
+
+#exit
+
+#Create files from existing required (REQ) files
+printf "Creating new files from existing required (REQ) files..."
+	
+#REQ_obs_codes_other_than_tree_status.txt
+	grep -vE '^#|^$' ${req_files_folder}/REQ_data_types.txt |awk -F "\t" '{if ($14 == "obs_code" && $15 != "1") print $1}'|sort -u > ${req_files_folder}/REQ_obs_codes_other_than_tree_status.txt
+
+
+#Extract only the codes from obs_codes.txt
+	cut -f4 -d $'\t' ${req_files_folder}/obs_codes.txt|sort > ${temp_f}/TreeSource_all_obs_codes_only.txt
+
+#Fromobs_codes.txt, keep only codes that are going to be used in Excel files coming from field work.
+	awk -F "\t" '{if ($5 == "t") print $1"\t"$3"\t"$4"\t"$6}' ${req_files_folder}/obs_codes.txt |sort -t $'\t' -k1,1 -k2,2 |cat ${req_files_folder}/REQ_obs_codes_conv_table2_header.txt - > ${req_files_folder}/REQ_obs_codes_conv_table2_sel_codes.txt
+
+
+#Lines before 2023-02-07: Extract the list of sites (code and establishment_year)
+#	psql -d ts_pi -A -t -F "___" -c "select code,plantation_establishment_date_from,plantation_establishment_date_to,establishment_year from sites where code NOT LIKE '(%' order by code" |perl -pe 's/___/\t/g' > ${temp_f}/TreeSource_sites_code_and_plantation_dates_and_years.txt
+#	dos2unix ${temp_f}/TreeSource_sites_code_and_plantation_dates_and_years.txt 2> /dev/null
 
 #[NEW 20210709] Create the a conversion table between INFO_TYPE headers and actual table fields
 #Previously, this was kept in REQ_replacement_headers.txt, but it is now generated on-the-fly here.
@@ -1413,6 +1512,8 @@ grep -vE '^#|^$|^-' ${req_files_folder}/REQ_data_types.txt|awk -F "\t" '{print $
 
 
 printf "done.\n"
+
+
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1491,7 +1592,7 @@ case $(echo $?) in
 			done
 			printf "\n"
 			
-			if [ $choice == "y" ]
+			if [[ $choice == "y" ]]
 			then
 				printf "SET TO DEFAULT: ${param_default_value}.\n" >> ${param_jfile}
 				chosen_value=${param_default_value}
@@ -1514,7 +1615,7 @@ esac
 	
 	#Special case: parameter_name="plantation_team_employees": get team_id from it.
 	#8/1/2015
-	if [ ${param_name} == "plantation_team_employees" ]
+	if [[ ${param_name} == "plantation_team_employees" ]]
 	then
 		plantation_team_id_pt_dev=$(psql -d ts_d -t -A -c "SELECT fnct_get_team_from_employees('${plantation_team_employees}');")
 		plantation_team_id_pt_prod=$(psql -d ts_pi -t -A -c "SELECT fnct_get_team_from_employees('${plantation_team_employees}');")
@@ -1559,7 +1660,10 @@ printf "Have a look at the file $param_jfile for details.\n\n"
 site_code=$(echo ${site_code}|tr '[:lower:]' '[:upper:]')
 
 printf "Looking for the existence of site code ${site_code} in the database..."
-site_found_in_db=$(echo ${site_code}|join -t $'\t' - <(sort -k1,1 ${temp_f}/TreeSource_sites_code_and_plantation_dates_and_years.txt) ) 
+#Line before 2023-02-07: site_found_in_db=$(echo ${site_code}|join -t $'\t' - <(sort -k1,1 ${temp_f}/TreeSource_sites_code_and_plantation_dates_and_years.txt) ) 
+site_found_in_db=$(echo ${site_code}|join -t $'\t' - <(sort -k1,1 ${req_files_folder}/all_sites.txt) ) 
+
+
 
 #Check that the site code exists in the database
 if [ -z ${site_found_in_db} ]
@@ -1622,7 +1726,8 @@ printf "Looking for the plantation date/year of ${site_code} in the database..."
 #---------------------------------------------------------------------------
 printf "Looking for the existence of data_source_id=${data_source_id} in the database..."
 
-if [ -z $(echo ${data_source_id}|join -t $'\t' - <(sort -k1,1 ${temp_f}/TreeSource_data_source_ids.txt) ) ]
+#Line before 2023-02-07: if [ -z $(echo ${data_source_id}|join -t $'\t' - <(sort -k1,1 ${temp_f}/TreeSource_data_source_ids.txt) ) ]
+if [ -z $(echo ${data_source_id}|join -t $'\t' - <(cut -d $'\t' -f1 ${req_files_folder}/all_data_source_ids.txt|sort) ) ]
 then
 	printf "NOT FOUND!\n"
 	printf "\t${red_color}The data_source_id ${data_source_id} does not exist in the database.\n\tPLEASE ADD IT TO THE data_sources table and restart the script.${normal_color}\n"
@@ -1658,7 +1763,9 @@ printf "Checking the ${req_files_folder}/REQ_site-specific_values_substitution_u
 
 #col 1: sites codes - check that each code exists in  
 #join <(grep -vE '^[[:space:]]*#|^[[:space:]]*$' ${req_files_folder}/REQ_site-specific_values_substitution_utf.txt|cut -f1|sort|uniq|grep -v 'ALL') <(cut -f1 ${temp_f}/TreeSource_sites_code_and_plantation_dates_and_years.txt|sort) -v1 > ${temp_f}/REQ_site-specific_values_substitution_site_codes_ERRORS.txt
-join -t $'\t' <(grep -vE '^[[:space:]]*#|^[[:space:]]*$' ${req_files_folder}/REQ_site-specific_values_substitution_utf.txt|awk -F "\t" '{if($1 != "ALL") print}'|sort -k1,1) <(cut -f1 ${temp_f}/TreeSource_sites_code_and_plantation_dates_and_years.txt|sort) -v1 > ${temp_f}/REQ_site-specific_values_substitution_site_codes_ERRORS.txt
+#Line before 2023-02-07: join -t $'\t' <(grep -vE '^[[:space:]]*#|^[[:space:]]*$' ${req_files_folder}/REQ_site-specific_values_substitution_utf.txt|awk -F "\t" '{if($1 != "ALL") print}'|sort -k1,1) <(cut -f1 ${temp_f}/TreeSource_sites_code_and_plantation_dates_and_years.txt|sort) -v1 > ${temp_f}/REQ_site-specific_values_substitution_site_codes_ERRORS.txt
+join -t $'\t' <(grep -vE '^[[:space:]]*#|^[[:space:]]*$' ${req_files_folder}/REQ_site-specific_values_substitution_utf.txt|awk -F "\t" '{if($1 != "ALL") print}'|sort -k1,1) <(cut -f1 ${req_files_folder}/all_sites.txt|sort) -v1 > ${temp_f}/REQ_site-specific_values_substitution_site_codes_ERRORS.txt
+
 
 #If some of the site codes found in ${temp_f}/REQ_site-specific_values_substitution_site_codes.txt DO NOT exist in TreeSource:
 if [ -s ${temp_f}/REQ_site-specific_values_substitution_site_codes_ERRORS.txt ]
@@ -1668,7 +1775,7 @@ then
 	#Note: the current site code existence was confirmed in section 5. Site parameters, no need to re-check here.
 	printf "None of these lines are related to the current site (${site_code}).\n"
 	choice="-";while [ ! $(echo $choice|grep '[yn]') ];do printf "${green_color}\r"; read -p "Do you still want to continue [y/n]?" -n1 -s choice;done;printf "\n${normal_color}"
-	if [ $choice == "n" ]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
+	if [[ $choice == "n" ]]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
 
 fi
 
@@ -1693,7 +1800,7 @@ then
 	else #warn and offer to continue
 		printf "None of these lines are related to the current site (${site_code}).\n"
 		choice="-";while [ ! $(echo $choice|grep '[yn]') ];do printf "${green_color}\r"; read -p "Do you still want to continue [y/n]?" -n1 -s choice;done;printf "\n${normal_color}"
-			if [ $choice == "n" ]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
+			if [[ $choice == "n" ]]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
 	
 	fi
 fi
@@ -1720,7 +1827,7 @@ then
 	else #warn and offer to continue
 		printf "None of these lines are related to the current site (${site_code}).\n"
 		choice="-";while [ ! $(echo $choice|grep '[yn]') ];do printf "${green_color}\r"; read -p "Do you still want to continue [y/n]?" -n1 -s choice;done;printf "\n${normal_color}"
-			if [ $choice == "n" ]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
+			if [[ $choice == "n" ]]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
 	fi	
 fi
 
@@ -1765,7 +1872,7 @@ then
 	else #warn and offer to continue
 		printf "None of these lines are related to the current site (${site_code}).\n"
 		choice="-";while [ ! $(echo $choice|grep '[yn]') ];do printf "${green_color}\r"; read -p "Do you still want to continue [y/n]?" -n1 -s choice;done;printf "\n${normal_color}"
-			if [ $choice == "n" ]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
+			if [[ $choice == "n" ]]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
 	
 	fi
 	
@@ -1794,7 +1901,7 @@ then
 	else #warn and offer to continue
 		printf "None of these lines are related to the current site (${site_code}).\n"
 		choice="-";while [ ! $(echo $choice|grep '[yn]') ];do printf "${green_color}\r"; read -p "Do you still want to continue [y/n]?" -n1 -s choice;done;printf "\n${normal_color}"
-			if [ $choice == "n" ]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
+			if [[ $choice == "n" ]]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
 	
 	fi
 	
@@ -1829,7 +1936,7 @@ then
 	else #warn and offer to continue
 		printf "None of these lines are related to the current site (${site_code}).\n"
 		choice="-";while [ ! $(echo $choice|grep '[yn]') ];do printf "${green_color}\r"; read -p "Do you still want to continue [y/n]?" -n1 -s choice;done;printf "\n${normal_color}"
-			if [ $choice == "n" ]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
+			if [[ $choice == "n" ]]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
 	
 	fi
 	
@@ -1853,7 +1960,7 @@ then
 	else #warn and offer to continue
 		printf "None of these lines are related to the current site (${site_code}).\n"
 		choice="-";while [ ! $(echo $choice|grep '[yn]') ];do printf "${green_color}\r"; read -p "Do you still want to continue [y/n]?" -n1 -s choice;done;printf "\n${normal_color}"
-			if [ $choice == "n" ]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
+			if [[ $choice == "n" ]]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
 	
 	fi
 	
@@ -2027,6 +2134,16 @@ echo "-----------------------------"
 		#Join by date the user-modified file  and the original distinct_dates.txt file, and keep only columns 1 &2, to remove anything else
 		join -t $'\t' ${temp_f}/distinct_dates.txt ${temp_f}/team_employees_per_date.txt|cut -f1,2 > ${temp_f}/temp.txt
 		mv ${temp_f}/temp.txt ${temp_f}/team_employees_per_date.txt
+		#team_employees_per_date.txt
+		#2017-09-27	NULL
+		#Where:
+		#	Column 1: distinct dates found
+		#	Column 2: NULL value set by default, to be replaced with employee names.
+		
+		#Example after filling:
+		#2017-09-27	Roger Cadorette, Pierre Flynn
+		
+		
 		
 		#Test if user-modified file has anything else than 2 columns
 		if [ $(awk -F "\t" '{print NF}' ${temp_f}/team_employees_per_date.txt|sort -nu|head -1) -ne 2 ]
@@ -2051,9 +2168,29 @@ echo "-----------------------------"
 				
 		#Get correspoding id from ts_d and ts_pi
 		awk -F "\t" '{print "SELECT '\''"$1"'\'','\''"$2"'\'',fnct_get_team_from_employees('\''"$2"'\'');"}' ${temp_f}/team_employees_per_date_utf.txt > ${temp_f}/SQL_get_team_id_from_employee_names.txt
+		#SQL_get_team_id_from_employee_names.txt
+		#SELECT '2017-09-27','Roger Cadorette, Pierre Flynn',fnct_get_team_from_employees('Roger Cadorette, Pierre Flynn');
+
+		#2023-02-08: V�rifications: le fichier existe bel et bien, mais psql agit comme s'il n'existait pas.
+		#echo ${temp_f}/SQL_get_team_id_from_employee_names.txt
+		#cat ${temp_f}/SQL_get_team_id_from_employee_names.txt
+		#if [ -e ${temp_f}/SQL_get_team_id_from_employee_names.txt ]; then echo "Le fichier ${temp_f}/SQL_get_team_id_from_employee_names.txt existe";else echo "Le fichier ${temp_f}/SQL_get_team_id_from_employee_names.txt N'EXISTE PAS.";fi
+		
+		#2023-02-08: I tried shortening the access path, but to no avail. psql seems to be the culprit.
+		#cp ${temp_f}/SQL_get_team_id_from_employee_names.txt /dev/shm/a.txt
+		#psql -d ts_d -t -A -F "___" -f "/dev/shm/a.txt"|perl -pe 's/___/\t/g' > ${temp_f}/date_employees_teamid_pt_dev.txt
+		#This seems to be a Cygwin specific error for psql, as it works fine on a Linux server.
+		
 		psql -d ts_d -t -A -F "___" -f "${temp_f}/SQL_get_team_id_from_employee_names.txt"|perl -pe 's/___/\t/g' > ${temp_f}/date_employees_teamid_pt_dev.txt
 		psql -d ts_pi -t -A -F "___" -f "${temp_f}/SQL_get_team_id_from_employee_names.txt"|perl -pe 's/___/\t/g' > ${temp_f}/date_employees_teamid_pt_prod.txt
-
+		
+		#Exemple de fichier date_employees_teamid_pt_dev.txt
+		#2017-09-27	Roger Cadorette, Pierre Flynn	138
+		#O�:
+		#	Colonne 3: num�ro d'�quipe existante ou nouvellement cr��e
+		
+		#exit
+		
 		#Make sure the result for team_id fetching is the same in the two databases, otherwise, that means that they are not synchronized for team ids. Warn and exit.
 		if [ $(diff ${temp_f}/date_employees_teamid_pt_dev.txt ${temp_f}/date_employees_teamid_pt_prod.txt|wc -l) -ne 0 ]
 		then
@@ -2248,7 +2385,7 @@ echo "-----------------------------------------------"
 		perl -pe 's/^/\t/g' ${temp_f}/FAMPROV_too_long.txt
 		printf "${red_color}If these values are normal, or will be substituted as specified in REQ_site-specific_values_substitution_utf.txt, press y to continue. If not, press n to abort.\n${normal_color}"
 		choice="-";while [ ! $(echo $choice|grep '[yn]') ];do printf "\r\t"; read -p "Accept [y/n]?" -n1 -s choice;done;printf "\n"
-		if [ $choice == "n" ]
+		if [[ $choice == "n" ]]
 		then 
 			printf "Please, check the original Excel file for family/provenance numbers > ${famprovchars}.\n"
 			printf "${red_color}***ABORTED***${normal_color}\n"
@@ -2809,7 +2946,7 @@ then
 	perl -pe 's/^/\t/g' ${temp_f}/file_and_db_common_obs_years.txt
 	printf "Continue? Note: any duplicate in coded observation for a given date will cause an error at insertion time.${normal_color}\n"
 	already_imp_data_choice="-";while [ ! $(echo $already_imp_data_choice|grep '[Yn]') ];do printf "\r\t"; read -p "[Y/n]?" -n1 -s already_imp_data_choice;done;printf "\n"
-	if [ ${already_imp_data_choice} == "n" ];then printf "${red_color}\n***ABORTING***\n${normal_color}";exit;fi
+	if [[ ${already_imp_data_choice} == "n" ]];then printf "${red_color}\n***ABORTING***\n${normal_color}";exit;fi
 else
 	printf "Coded observations: ok, all are new.\n"
 fi
@@ -2825,7 +2962,7 @@ then
 	perl -pe 's/^/\t/g' ${temp_f}/file_and_db_common_meas_years.txt
 	printf "Continue? Note: any duplicate in tree mensurations for a year will cause an error at insertion time.${normal_color}\n"
 	already_imp_data_choice="-";while [ ! $(echo $already_imp_data_choice|grep '[Yn]') ];do printf "\r\t"; read -p "[Y/n]?" -n1 -s already_imp_data_choice;done;printf "\n"
-	if [ ${already_imp_data_choice} == "n" ];then printf "${red_color}\n***ABORTING***\n${normal_color}";exit;fi
+	if [[ ${already_imp_data_choice} == "n" ]];then printf "${red_color}\n***ABORTING***\n${normal_color}";exit;fi
 else
 	printf "Measurements: ok, all are new.\n"
 fi
@@ -3065,7 +3202,7 @@ echo "--------------------------------------------------------------------------
 			printf "${red_color}The following codes (for final file substitutions) in the REQ_site-specific_values_substitution_utf.txt file DO NOT EXIST IN TREESOURCE!\nIf you accept them, you will be asked to provide a description for those new codes.\nIf you don't accept them, the script will be interrupted.${normal_color}\n"
 			perl -pe 's/^/\t/g'  ${temp_f}/nonexistent_codes.txt
 			choice="-";while [ ! $(echo $choice|grep '[yn]') ];do printf "${red_color}\r"; read -p "Accept [y/n]?" -n1 -s choice;done;printf "\n${normal_color}"
-			if [ $choice == "n" ]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
+			if [[ $choice == "n" ]]; then printf "${red_color}***ABORTED***${normal_color}\n";exit;fi
 
 
 			#User accepted the new codes, add them to TreeSource
@@ -3083,20 +3220,20 @@ echo "--------------------------------------------------------------------------
 				code_description_dsquotes=$(echo ${code_description}|perl -pe "s/'/''/g")
 				
 				code_tree_is_dead="-";while [ ! $(echo $code_tree_is_dead|grep '[tf\?]') ];do printf "\r\t"; read -p "Does the code imply that tree is dead [t/f/?]?" -n1 -s code_tree_is_dead;done;printf "\n"
-				if [ $code_tree_is_dead == "t" ]
+				if [[ $code_tree_is_dead == "t" ]]
 				then
 					code_tree_is_dead="TRUE"
 				else
-					if [ $code_tree_is_dead == "f" ];then code_tree_is_dead="FALSE";else code_tree_is_dead="NULL";fi
+					if [[ $code_tree_is_dead == "f" ]];then code_tree_is_dead="FALSE";else code_tree_is_dead="NULL";fi
 				fi
 				
 				
 				code_tree_growth_is_affected="-";while [ ! $(echo $code_tree_growth_is_affected|grep '[tf\?]') ];do printf "\r\t"; read -p "Does the code imply that tree growth is affected [t/f/?]?" -n1 -s code_tree_growth_is_affected;done;printf "\n"
-				if [ $code_tree_growth_is_affected == "t" ]
+				if [[ $code_tree_growth_is_affected == "t" ]]
 				then
 					code_tree_growth_is_affected="TRUE"
 				else
-					if [ $code_tree_growth_is_affected == "f" ];then code_tree_growth_is_affected="FALSE";else code_tree_growth_is_affected="NULL";fi
+					if [[ $code_tree_growth_is_affected == "f" ]];then code_tree_growth_is_affected="FALSE";else code_tree_growth_is_affected="NULL";fi
 				fi
 				code_category_choice="-";while [ ! $(echo $code_category_choice|grep '[123]') ];do printf "\r\t"; read -p "Category: 1) Tree status  2) Tree damages  3) Tree deformations" -n1 -s code_category_choice;done;printf "\n"
 				
@@ -3222,11 +3359,11 @@ do
 	column_name=$(printf "%03d_$header_name_date\n" $column_no)
 
 	#If the header is ${skip_char}, that column will not be analyzed
-	if [ $header_name == ${skip_char} ];then skip=1;else skip=0;fi
+	if [[ $header_name == ${skip_char} ]];then skip=1;else skip=0;fi
 	
 	
 	#If a file is specified for reference values, add the REQ path before
-	if [ $ref_values_file != "-" ];then ref_values_file="${req_files_folder}/${ref_values_file}";fi
+	if [[ $ref_values_file != "-" ]];then ref_values_file="${req_files_folder}/${ref_values_file}";fi
 	#echo $ref_values_file
 
 
@@ -3273,7 +3410,7 @@ then
 	grep 'CHECK' wholesite_columns_validation_temp_folder/summary.txt |cut -f1,11|perl -pe 's/^/\t/g'
 	printf "\n${red_color}If you have read the journal file and want to ignore the warnings, press \"y\" to continue\n${normal_color}"
 	choice="-";while [  ! $(echo $choice|grep '[yn]') ];do printf "\r\t"; read -p "Continue [y/n]?" -n1 -s choice;done;printf "\n"
-	if [ $choice == "n" ]; then printf "${red_color}***ABORTING***${normal_color}\n";exit;fi
+	if [[ $choice == "n" ]]; then printf "${red_color}***ABORTING***${normal_color}\n";exit;fi
 fi
 
 
@@ -3329,7 +3466,7 @@ fi
 
 
 
-exit
+
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3338,12 +3475,6 @@ exit
 echo
 echo "Calculating germplasm names:"
 echo "-----------------------------"
-
-
-#[NEW20211203]: calculate germplasm names only when no names were already provided
-##**************Ajouter un IF ici.
-
-
 
 #[NEW 2010707] Note: presence of required fields (e.g. BLOCK, FAMPROV, TREE, COMPARTMENT, etc.) to calculate the germplasm name based on the tree_name_format parameter has already been checked around line #2100
 #---> See required/optional columns in REQ_germplasm_name_fields.txt).
@@ -3388,7 +3519,13 @@ done
 #If there is no sequence, generate a SEQUENCE.txt file filled with 0's
 if [ $SEQUENCE_col -eq 0 ]
 then
-	echo "NOTE: No sequence numbers for that site. The sequence number part in the tree name will be '00000'."
+	
+	#New 2023-02-08: show only if tree name actually used a sequence number 
+	case $tree_name_format in "S_B_F_T_S") 
+		echo "NOTE: No sequence numbers for that site. The sequence number part in the tree name will be '00000'."
+		;; 
+	esac
+		
 	nb_of_trees=$(cat ${temp_f}/BLOCK.txt|wc -l)
 	for i in $(seq ${nb_of_trees}); do echo 0;done > ${temp_f}/SEQUENCE.txt
 fi
@@ -3439,7 +3576,39 @@ fi
 #[NEW 20210707]: depending on the name format chosen, calculate the tree name.
 #Note: all the required fields for those name formats have been verified above (line 2104+), so here is just the combination of those fields.
 case $tree_name_format in
-	
+
+	#[NEW 2023-02-06]
+	"S_B_F_T")
+		
+		#Example: E60A_01_00003_02
+		#01 = block #, 00003 = provenance #, 02 = tree #
+		
+		
+		#Left-pad fields with number of digits specific to this tree name format
+		#-------------------------------------------------------------------------------------
+		#BLOCK
+			max_digits_block_field=2	#set manually, overrides the value set automatically above
+			unknown_block_no_replacer=$(echo ${string_of_xs:0:$max_digits_block_field})
+			awk -v awk_mdbf=$max_digits_block_field -v awk_ubnr=$unknown_tree_no_replacer '{if ($1 ~ /^[0-9]+$/) printf "%0"awk_mdbf"d\n",$1;else print awk_ubnr}' ${temp_f}/BLOCK.txt > ${temp_f}/BLOCK_left-padded.txt
+						
+
+		#TREE:
+			max_digits_tree_field=2	#set manually, overrides the value set automatically above
+			unknown_tree_no_replacer=$(echo ${string_of_xs:0:$max_digits_tree_field})
+			awk -v awk_mdtf=$max_digits_tree_field -v awk_utnr=$unknown_tree_no_replacer '{if ($1 ~ /^[0-9]+$/) printf "%0"awk_mdtf"d\n",$1;else print awk_utnr}' ${temp_f}/TREE.txt > ${temp_f}/TREE_left-padded.txt
+		
+			
+		
+		#1. Site code is passed as a string from ${site_code} parameter
+		#2. Block number from BLOCK_left-padded.txt, already left-padded above, passed here as a string (%s)
+		#3. Family/provenance number is from FAMPROV_left-padded.txt file, already left-padded above, passed here as a string (%s).
+		#4. Tree number is from TREE_left-padded.txt file, already left-padded above, passed here as a string (%s).
+		
+		paste ${temp_f}/BLOCK_left-padded.txt ${temp_f}/FAMPROV_left-padded.txt ${temp_f}/TREE_left-padded.txt |awk -F "\t" -v awk_SITE_CODE=$site_code '{printf awk_SITE_CODE"_%s_%s_%s\n",$1,$2,$3,$4}'|cat <(printf "temp_germplasm_name\n") - > ${temp_f}/germplasm_names.txt
+		;;
+
+
+
 	"S_B_F_T_S")
 		
 		#Example: E410D2_05_00425_002_06194_00
@@ -3565,25 +3734,33 @@ esac
 #exit
 
 
-
-
-
-
-#********C'est ici qu'on devra terminer le IF s'il existe une colonne de noms, car les �tapes suivantes s'y appliqueront aussi. 
-
-
-
-
-
-
-
-
 printf "First 20 lines of calculated germplasm names:\n"
 head -20 ${temp_f}/germplasm_names.txt|perl -pe 's/^/\t/g'
+#NOTE: there's a header!
+#	temp_germplasm_name
+#       E60A_01_00002_01
+#       E60A_01_00002_02
+#        E60A_01_00002_03
+#        E60A_01_00002_04
+
+#Create a file wo header
+tail -n+2 ${temp_f}/germplasm_names.txt > ${temp_f}/germplasm_names_no_header.txt
+#E60A_01_00002_01
+#E60A_01_00002_02
+#E60A_01_00002_03
+#E60A_01_00002_04
+#E60A_01_00002_05
+#E60A_01_00002_06
+#E60A_01_00002_07
+#E60A_01_00002_08
+#E60A_01_00005_01
+#E60A_01_00005_02
+
 
 
 #Check if some names are repeated
-tail -n+2 ${temp_f}/germplasm_names.txt |sort|uniq -d > ${temp_f}/repeated_germplasm_names.txt
+#-------------------------------------------------------------------------------------------------------------------------------------
+tail -n+2 ${temp_f}/germplasm_names_no_header.txt |sort|uniq -d > ${temp_f}/repeated_germplasm_names.txt
 if [ $(cat ${temp_f}/repeated_germplasm_names.txt|wc -l) -gt 0 ]
 #If names repeated, warn and exit
 then
@@ -3594,9 +3771,160 @@ then
 fi
 
 
-#Add names to the cleaned file
-paste ${temp_f}/cleaned_infile2.txt ${temp_f}/germplasm_names.txt  > ${temp_f}/temp.txt
-mv ${temp_f}/temp.txt ${temp_f}/cleaned_infile2.txt
+
+#[NEW 2023-02-06] Check that the names exist in TreeSource (${req_files_folder}/all_germplasm_names.txt)
+#-------------------------------------------------------------------------------------------------------------------------------------
+
+#Do this only if this is new data on trees already recorded in TreeSource! (additional_data=1)
+
+if [ ${additional_data} -eq 1 ]
+then
+	germplasm_name_or_id=2	#Will take column #2 (germplasm_id) from germplasm_names.txt to add to final files.
+		
+	printf "Checking that calculated germplasm names are identical to those in TreeSource..."
+	#Count the number of names from input file
+	infile_germplasm_names_count=$(cat ${temp_f}/germplasm_names_no_header.txt|wc -l)
+	#echo infile_germplasm_names_count $infile_germplasm_names_count
+
+	#Extract REFERENCE names and germplasm_id's from all_germplasm_names.txt for the current site only.
+	awk -F "\t" -v awk_sc=${site_code} '{if ($1 ~ "^"awk_sc"_" && $4 == "t") print $1"\t"$2}' ${req_files_folder}/all_germplasm_names.txt > ${temp_f}/current_site_germplasm_names_and_ids.txt
+	
+	
+	#2023-02-13: number the original germplasm_names_no_header.txt lines to restore the original order after the join below!
+	cat -n ${temp_f}/germplasm_names_no_header.txt|awk -F "\t" '{print $2"\t"$1}' > ${temp_f}/germplasm_names_no_header_numbered.txt
+	
+	
+	#Get the names and ids from TreeSource
+	#
+	join -t $'\t' <(sort -k1,1 ${temp_f}/germplasm_names_no_header_numbered.txt) <(sort -k1,1 ${temp_f}/current_site_germplasm_names_and_ids.txt) > ${temp_f}/germplasm_names_validated_in_ts_no_header.txt
+
+	#${temp_f}/germplasm_names_validated_in_ts_no_header.txt
+	#E60A_01_00002_01             1  817173
+	#E60A_01_00002_02             2  817174
+	#E60A_01_00002_03             3  817175
+	#E60A_01_00002_04             4  817176
+	#E60A_01_00002_05             5  817177
+	#E60A_01_00002_06             6  817178
+	#E60A_01_00002_07             7  817179
+	#E60A_01_00002_08             8  817180
+	#E60A_01_00005_01             9  817197
+	#E60A_01_00005_02            10  817198
+	#E60A_01_00005_03            11  817199
+	#E60A_01_00005_04            12  817200
+	#E60A_01_00005_05            13  817201
+	#E60A_01_00005_06            14  817202
+	#E60A_01_00005_07            15  817203
+	#E60A_01_00005_08            16  817204
+	#E60A_01_00007_01            25  817213
+	#E60A_01_00007_02            26  817214
+	#E60A_01_00007_03            27  817215
+	#(...)
+
+
+	#2023-02-13: replace in original order and remove the numbers
+	awk -F "\t" '{print $2"\t"$1"\t"$3}' ${temp_f}/germplasm_names_validated_in_ts_no_header.txt|sort -k1,1n -t $'\t'|cut -f1 -d $'\t' --complement > ${temp_f}/germplasm_names_temp.txt
+	mv ${temp_f}/germplasm_names_temp.txt ${temp_f}/germplasm_names_validated_in_ts_no_header.txt
+	#E60A_01_00002_01        817173
+	#E60A_01_00002_02        817174
+	#E60A_01_00002_03        817175
+	#E60A_01_00002_04        817176
+	#E60A_01_00002_05        817177
+	#E60A_01_00002_06        817178
+	#E60A_01_00002_07        817179
+	#E60A_01_00002_08        817180
+	#E60A_01_00005_01        817197
+	#E60A_01_00005_02        817198
+	#E60A_01_00005_03        817199
+	#E60A_01_00005_04        817200
+	#E60A_01_00005_05        817201
+	#E60A_01_00005_06        817202
+	#E60A_01_00005_07        817203
+	#E60A_01_00005_08        817204
+	#E60A_01_00010_01        817237
+	#E60A_01_00010_02        817238
+	#E60A_01_00010_03        817239
+	#E60A_01_00010_04        817240
+
+
+
+	#Count the number of lines in common
+	common_names_count=$(cat ${temp_f}/germplasm_names_validated_in_ts_no_header.txt|wc -l)
+	#echo common_names_count $common_names_count
+
+
+	#If number of names in input file differs from those found in TreeSource
+	if [ ${infile_germplasm_names_count} -ne ${common_names_count} ]
+	then
+		join -t $'\t' -v1 <(sort ${temp_f}/germplasm_names_no_header.txt) <(cut -f1 -d $'\t' ${temp_f}/current_site_germplasm_names_and_ids.txt|sort) > ${temp_f}/germplasm_names_not_found_in_ts.txt
+		printf "${red_color}WARNING - The following $(cat ${temp_f}/germplasm_names_not_found_in_ts.txt|wc -l) names were NOT FOUND in TreeSource (first 20 rows shown):\n"
+		head -20 ${temp_f}/germplasm_names_not_found_in_ts.txt|perl -pe 's/^/\t/g'
+		printf "View the ${temp_f}/germplasm_names_not_found_in_ts.txt file\n"
+		printf "Please, correct the names in ${infile} (${temp_f}/infile_utf.txt)\n${normal_color}"
+		fnct_aborting
+	fi
+
+	#Add header to ${temp_f}/germplasm_names_validated_in_ts_no_header.txt
+	#-------------------------------------------------------------------------------------------------------------------------------------
+	cat <(printf "temp_germplasm_name\tgermplasm_id\n") ${temp_f}/germplasm_names_validated_in_ts_no_header.txt > ${temp_f}/germplasm_names_validated_in_ts.txt
+
+	#Copy this to germplasm_names.txt
+	cp ${temp_f}/germplasm_names_validated_in_ts.txt ${temp_f}/germplasm_names.txt
+
+	#head ${temp_f}/germplasm_names_validated_in_ts.txt
+
+	
+	printf "ok!\n\n"
+
+else
+	germplasm_name_or_id=1	#Will take column #1 (temp_germplasm_name) from germplasm_names.txt to add to final files.
+	printf "New data that was never entered into TreeSource, calculated germplasm names will not be checked against those in TreeSource.\n"
+
+fi
+
+#Note: depending on the step above, germplasm_names.txt will either contain a germplasm_id column (${additional_data}=1) or not (${additional_data}=0)
+	#The following variable (determined above) will determine which column from germplasm_names will be taken.
+	#germplasm_name_or_id (1 = col1 = temp_germplasm_name, 2 = col2 = germplasm_id)
+
+
+	#germplasm_names.txt
+	#----------------------------------------------
+	
+	#1. No prior data ($additional_data=0) 
+	#-------------------
+	#temp_germplasm_name
+	#E60A_01_00002_01
+	#E60A_01_00002_02
+	#E60A_01_00002_03
+	#E60A_01_00002_04
+	#E60A_01_00002_05
+	#(...)
+
+	#2. Existing data ($additional_data=1) 
+	#-------------------
+	#temp_germplasm_name	germplasm_id
+	#E60A_01_00002_01        817173
+	#E60A_01_00002_02        817174
+	#E60A_01_00002_03        817175
+	#E60A_01_00002_04        817176
+	#E60A_01_00002_05        817177
+	#(...)
+
+
+
+#Add names at the end of the cleaned file (original file used by the script)
+#-------------------------------------------------------------------------------------------------------------------------------------
+#2023-02-08: we decided to get away from the germplasm name and id columns addition and to and extraction from cleaned_infile2.txt, as we already have the germplasm_names.txt file that contains exactly the same info. This spares the hassle.
+		#La colonne #1 de ${temp_f}/germplasm_names.txt = l'avant derni�re colonne de ${temp_f}/cleaned_infile2.txt, soit temp_germplasm_name
+		#La colonne #2 de ${temp_f}/germplasm_names.txt = laderni�re colonne de ${temp_f}/cleaned_infile2.txt, soit temp_germplasm_id
+		#Ajouter germplasm_names.txt � cleaned_infile2.txt et d�finir les variables germplasm_name_col et germplasm_id_col n'est pas vraiment utile.
+		#Pour confirmer:
+		#diff <(cut -f1 ${temp_f}/germplasm_names.txt) <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt)|wc -l
+		#0
+#2023-02-08: not anymore
+#paste ${temp_f}/cleaned_infile2.txt ${temp_f}/germplasm_names.txt  > ${temp_f}/temp.txt
+#mv ${temp_f}/temp.txt ${temp_f}/cleaned_infile2.txt
+
+
 #check if column number is consistent
 awk -F "\t" '{print NF}' ${temp_f}/cleaned_infile2.txt|sort|uniq -c > ${temp_f}/cleaned_file_col_count.txt
 if [ $(cat ${temp_f}/cleaned_file_col_count.txt|wc -l) -gt 1 ]
@@ -3604,10 +3932,20 @@ then
 	printf "WARNING - the number of columns in cleaned_file2.txt is inconsistent!\n"
 	cat ${temp_f}/cleaned_file_col_count.txt|perl -pe 's/^/\t/g'
 	fnct_aborting
-else
-	germplasm_name_col=$(awk -F "\t" '{print NF}' ${temp_f}/cleaned_infile2.txt|sort -u)
-	echo "germplasm_name column: $germplasm_name_col"
+#else
+	#2023-02-08: we decided to get away from the germplasm name and id columns extractions from cleaned_infile2.txt, as we already have the germplasm_names.txt file that contains exactly the same info. This spares the hassle.
+	#See above.	
+		#Line before 2023-02-08: last column always assumed as the temp_gremplasm_name column, which is no longer true germplasm_name_col=$(awk -F "\t" '{print NF}' ${temp_f}/cleaned_infile2.txt|sort -u)
+		#Note: the perl command at the ends makes sure to remove the leading spaces introduced by cat -n
+		#germplasm_name_col=$(head -1 ${temp_f}/cleaned_infile2.txt |perl -pe 's/\t/\n/g'|cat -n|awk -F "\t" '{if ($2 == "temp_germplasm_name") print $1}'|perl -pe 's/ //g')
+		#New 2023-02-08
+		#germplasm_id_col=$(head -1 ${temp_f}/cleaned_infile2.txt |perl -pe 's/\t/\n/g'|cat -n|awk -F "\t" '{if ($2 == "germplasm_id") print $1}'|perl -pe 's/ //g')
+		
+		#echo "temp_germplasm_name column: $germplasm_name_col"
+		#echo "germplasm_id column: $germplasm_id_col"
 fi
+
+
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------
 #23. TABULATED FILES CREATION
@@ -3624,6 +3962,7 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 
 #A. germplasms
 #----------------------------------------------------------------
+#Can't use germplasm_id column, since it's for creation of new germplasms, which don't yet have a germplasm_id!
 	printf "germplasms..."
 	
 	if [ $additional_data -eq 0 ] #No data already existing in TreeSource
@@ -3641,7 +3980,7 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 				#Join the species abbreviated name with the real name using REQ_species_codes.txt. Any unrecognized abbreviation will get the '(Inconnu)' name, using a left join and a perl replacement
 				join -t $'\t' ${temp_f}/species_numbered.txt <(cut -f2,3 ${req_files_folder}/REQ_species_codes.txt|sort -t $'\t' -k1,1) -a1 |awk -F "\t" '{print $3"\t"$2}'|perl -pe 's/^\t/(Inconnu)\t/g'|sort -t $'\t' -k1,1 > ${temp_f}/species_realname_numbered.txt
 				#Get the species id from the real name and all_organisms.txt file
-				join -t $'\t' ${temp_f}/species_realname_numbered.txt <(awk -F "\t" '{print $2"\t"$1}' ${all_species_filepath}|sort -t $'\t' -k1,1)|cut -f2,3|sort -t $'\t' -k1,1n > ${temp_f}/species_id_numbered.txt
+				join -t $'\t' ${temp_f}/species_realname_numbered.txt <(awk -F "\t" '{print $2"\t"$1}' ${req_files_folder}/all_organisms.txt|sort -t $'\t' -k1,1)|cut -f2,3|sort -t $'\t' -k1,1n > ${temp_f}/species_id_numbered.txt
 				#Keep only the species id
 				cut -f2 ${temp_f}/species_id_numbered.txt > ${temp_f}/extracted_col_species_id.txt
 			else	
@@ -3661,7 +4000,13 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 			#Create the tabulated file by joining the different single-column files together and adding the invariable fields (e.g. $naming_organization_code, $data_source_id)
 			#Note: single-column files have NO HEADER
 			#Note: corrected for new structure (germplasm_name --> germplasm_id). 3/9/2013.
-			paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) ${temp_f}/extracted_col_species_id.txt ${temp_f}/extracted_col_gen_method.txt|perl -pe "s/\n/\t${germplasm_type}\t${naming_organization_code}\t${owning_organization_code}\t${data_source_id}\t${date_psql_format}\n/g"|cat <(printf "temp_name\torganism_id\tgeneration_method_code\ttype\ttemp_naming_organization_code\towning_organization_code\tdata_source_id\ttemp_date_named\n") - > ${temp_f}/2import_germplasms.txt
+			#Line before 2023-02-08: paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) ${temp_f}/extracted_col_species_id.txt ${temp_f}/extracted_col_gen_method.txt|perl -pe "s/\n/\t${germplasm_type}\t${naming_organization_code}\t${owning_organization_code}\t${data_source_id}\t${date_psql_format}\n/g"|cat <(printf "temp_name\torganism_id\tgeneration_method_code\ttype\ttemp_naming_organization_code\towning_organization_code\tdata_source_id\ttemp_date_named\n") - > ${temp_f}/2import_germplasms.txt
+			#2023-02-08: no longer relying on cleaned_infile2.txt.
+			#	Here, it is always the first column (temp_germplasm_name) of germplasm_names.txt that is added, only when trees do not yet exist in TreeSOurce, and hence, without existing germplasm_id's, will the command below be run.
+			#
+			paste <(cut -f1 -d $'\t' ${temp_f}/germplasm_names.txt|tail -n+2) ${temp_f}/extracted_col_species_id.txt ${temp_f}/extracted_col_gen_method.txt|perl -pe "s/\n/\t${germplasm_type}\t${naming_organization_code}\t${owning_organization_code}\t${data_source_id}\t${date_psql_format}\n/g"|cat <(printf "temp_name\torganism_id\tgeneration_method_code\ttype\ttemp_naming_organization_code\towning_organization_code\tdata_source_id\ttemp_date_named\n") - > ${temp_f}/2import_germplasms.txt
+			
+			
 			
 			printf "done\n"
 
@@ -3675,6 +4020,9 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 
 #B. germplasms_on_sites
 #----------------------------------------------------------------
+#If there are new records added in this table, it means that these trees were never entere into germplasms before.
+#	Hence, the INSERT will be done using the temp_germplasm_name column
+
 	printf "germplasms_on_sites..."
 	
 	
@@ -3732,7 +4080,11 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 		#	SLC30498_11_20916_2_0020
 
 		#remove first, empty column, then add germplasm names
-		paste ${temp_f}/germplasm_names.txt <(cut -f1 --complement ${temp_f}/temp_gos_opt.txt) > ${temp_f}/temp_gos_main.txt
+		#Line before 2023-02-08: paste ${temp_f}/germplasm_names.txt <(cut -f1 --complement ${temp_f}/temp_gos_opt.txt) > ${temp_f}/temp_gos_main.txt
+		#New line 2023-02-08: make sure to keep only the temp_germplasm_name column (pos 1) and discard the germplasm_id column (pos 2) if it exists
+		#	...because if records are being added in this table, it means that the trees do not yet exist in TreeSource, and hence do not have existing germplasm_id's.
+		paste <(cut -f1 -d $'\t' ${temp_f}/germplasm_names.txt) <(cut -f1 --complement ${temp_f}/temp_gos_opt.txt) > ${temp_f}/temp_gos_main.txt
+
 
 		#temp_gos_main.txt
 		#	temp_germplasm_name	BLOCK	COMPARTMENT	compartment_pos_x_within_site	compartment_pos_y_within_site	reading_direction_two_way	SEQUENCE	site_part	TREE	tree_pos_x_within_compartment	tree_pos_y_within_compartment
@@ -3779,6 +4131,9 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 		#Create empty file that will tell the section 25 to ignore that tabulated file.
 		printf "" > ${temp_f}/2import_germplasms_on_sites.txt
 	fi
+
+
+
 
 
 #C. coded_observations_on_germplasms
@@ -3855,7 +4210,7 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 
 		#If the observation file doesn't exist, create it. Otherwise, append to it
 		#The file created below will contain:
-			#1. germplasm_name
+			#1. germplasm_name or germplasm_id
 			#2. E column for the same date as the current observation field
 			#3. current observation field
 				#NOTE: columns 2 & 3 have leading/trailing spaces removed (perl -pe 's/^ +//g'|perl -pe 's/ +$//g')
@@ -3870,11 +4225,20 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 		
 		if [ ! -e ${temp_f}/${obs_filename} ]
 		then
-		#***TEAMCODE_ok_20150107***
-			paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${E_found_column} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g') <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g') |perl -pe "s/\n/\t${obs_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\n/g" > ${temp_f}/${obs_filename}
+			#Create
+			#Line before 2023-02-08: paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${E_found_column} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g') <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g') |perl -pe "s/\n/\t${obs_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\n/g" > ${temp_f}/${obs_filename}
+			#2023-02-08: Add temp_germplasm_name (col #1 of germplasm_names.txt) or germplasm_id (col #2 of germplasm_names.txt), and remove header (tail -n+2)
+			paste <(cut -f${germplasm_name_or_id} -d $'\t' ${temp_f}/germplasm_names.txt|tail -n+2) <(cut -f${E_found_column} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g') <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g') |perl -pe "s/\n/\t${obs_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\n/g" > ${temp_f}/${obs_filename}
 		else
-			paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${E_found_column} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g') <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g') |perl -pe "s/\n/\t${obs_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\n/g" >> ${temp_f}/${obs_filename}
+			#Append
+			#Line before 2023-02-08: paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${E_found_column} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g') <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g') |perl -pe "s/\n/\t${obs_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\n/g" >> ${temp_f}/${obs_filename}
+			#New 2023-02-8: if its new data, add the germplasm_id column instead of the temp_germplasm_name column. 
+			#2023-02-08: Add temp_germplasm_name (col #1 of germplasm_names.txt) or germplasm_id (col #2 of germplasm_names.txt), and remove header (tail -n+2)
+			paste <(cut -f${germplasm_name_or_id} -d $'\t' ${temp_f}/germplasm_names.txt|tail -n+2) <(cut -f${E_found_column} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g') <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g') |perl -pe "s/\n/\t${obs_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\n/g" >> ${temp_f}/${obs_filename}
+		
 		fi
+
+		#exit
 
 	done
 		#F.txt
@@ -3884,17 +4248,7 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 		#E93E_01_01968_004_00004_00	3	0	1979-09-01	TRUE	NULL	88
 		#E93E_01_01968_005_00005_00	1	0	1979-09-01	TRUE	NULL	88
 		#(...)
-		#E93E_01_01968_001_00001_00	1	0	1979-09-01	TRUE	NULL	88
-		#E93E_01_01968_002_00002_00	3	0	1979-09-01	TRUE	NULL	88
-		#E93E_01_01968_003_00003_00	1	0	1979-09-01	TRUE	NULL	88
-		#E93E_01_01968_004_00004_00	3	0	1979-09-01	TRUE	NULL	88
-		#E93E_01_01968_005_00005_00	1	0	1979-09-01	TRUE	NULL	88
-		#(...)
-		#E93E_01_01968_001_00001_00	1	0	1979-09-01	TRUE	NULL	88
-		#E93E_01_01968_002_00002_00	3	0	1979-09-01	TRUE	NULL	88
-		#E93E_01_01968_003_00003_00	1	0	1979-09-01	TRUE	NULL	88
-		#E93E_01_01968_004_00004_00	3	0	1979-09-01	TRUE	NULL	88
-		#E93E_01_01968_005_00005_00	1	0	1979-09-01	TRUE	NULL	88
+
 
 
 
@@ -4071,8 +4425,8 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 	done
 
 	#Add the header, remove the NULLs (eventually coming from REQ_obs_codes_conv_table2_sel_codes.txt) and create the final file
-	#***TEAMCODE_ok_20150107***
-	cat <(printf "temp_germplasm_name\tobs_code\tdate\tdate_is_approximate\tteam_id\tdata_source_id\n") <(sort -t $'\t' -k1,1 -k3,3 -k2,2 ${temp_f}/temp_all_cleaned_obs.txt|awk -F "\t" '{if ($2 != "NULL") print}') > ${temp_f}/2import_coded_observations_on_germplasms.txt
+	#2023-02-08: add either germplasm_id or temp_germplasm_name as header for the first column, depending on if it's added data on already existing trees in TreeSource or not.
+	cat <(printf "$(head -1 ${temp_f}/germplasm_names.txt|cut -f${germplasm_name_or_id} -d $'\t')\tobs_code\tdate\tdate_is_approximate\tteam_id\tdata_source_id\n") <(sort -t $'\t' -k1,1 -k3,3 -k2,2 ${temp_f}/temp_all_cleaned_obs.txt|awk -F "\t" '{if ($2 != "NULL") print}') > ${temp_f}/2import_coded_observations_on_germplasms.txt
 	
 	printf "done\n"
 
@@ -4153,15 +4507,18 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 
 
 		#When needed (when units_to <> "-"), get the conversion factor from units_from, units_to and REQ_units_conversion_table.txt
-		if [ $units_to != "-" ]
+		#2023-02-08: otherwise set conf_factor=1 (no conversion)
+		if [[ $units_to != "-" ]]
 		then
 			conv_factor=$(grep "^${units_from}[[:space:]]${units_to}[[:space:]]" ${req_files_folder}/REQ_units_conversion_table.txt |cut -f3)
+		else #2023-02-08, set to 1 (no conversion)
+			conv_factor=1
 		fi
 		
 		#Clean the column:
 		#If the measurement file doesn't exist, create it. Otherwise, append to it
 		#The file created below will contain:
-			#1. germplasm_name
+			#1. germplasm_name or germplasm_id
 			#2. current measurement
 				#NOTES: 
 					#1. remove leading/trailing spaces (perl -pe 's/^ +//g'|perl -pe 's/ +$//g')
@@ -4175,24 +4532,32 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 			#7. year
 		#NOTE: could use the fnct_clean_values function instead of cleaning here directly
 		if [ ! -e ${temp_f}/${meas_filename} ]
-		then
-			#If no units conversion is needed (units_to="-"), don't include it
-			if [ $units_to == "-" ]
-			then
-				#***TEAMCODE_ok_20150107***
-				paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/,/./g'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${meas_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\t${meas_year}\n/g" > ${temp_f}/${meas_filename}
-			else
-				paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/,/./g'|awk -v awk_cf=${conv_factor} '{print $1*awk_cf}'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${meas_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\t${meas_year}\n/g" > ${temp_f}/${meas_filename}
-			fi
-		else
-			#If no units conversion is needed (units_to="-"), don't include it
-			if [ $units_to == "-" ]
-			then
-				#***TEAMCODE_ok_20150107***
-				paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/,/./g'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${meas_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\t${meas_year}\n/g" >> ${temp_f}/${meas_filename}
-			else
-				paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/,/./g'|awk -v awk_cf=${conv_factor} '{print $1*awk_cf}'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${meas_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\t${meas_year}\n/g" >> ${temp_f}/${meas_filename}
-			fi
+		then	#Create
+			
+			#Block before 2023-02-08. No longer needed since conv_factor is set to 1 above when no conversion is needed.
+				#If no units conversion is needed (units_to="-"), don't include it
+				#if [[ $units_to == "-" ]]
+				#then
+				#	paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/,/./g'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${meas_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\t${meas_year}\n/g" > ${temp_f}/${meas_filename}
+				#else
+				#	paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/,/./g'|awk -v awk_cf=${conv_factor} '{print $1*awk_cf}'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${meas_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\t${meas_year}\n/g" > ${temp_f}/${meas_filename}
+				#fi
+		
+			paste <(cut -f${germplasm_name_or_id} -d $'\t' ${temp_f}/germplasm_names.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/,/./g'|awk -v awk_cf=${conv_factor} '{print $1*awk_cf}'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${meas_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\t${meas_year}\n/g" > ${temp_f}/${meas_filename}
+		
+		
+		else 	#Append
+			#Block before 2023-02-08. No longer needed since conv_factor is set to 1 above when no conversion is needed.
+				#If no units conversion is needed (units_to="-"), don't include it
+				#if [[ $units_to == "-" ]]
+				#then
+				#	paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/,/./g'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${meas_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\t${meas_year}\n/g" >> ${temp_f}/${meas_filename}
+				#else
+				#	paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/,/./g'|awk -v awk_cf=${conv_factor} '{print $1*awk_cf}'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${meas_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\t${meas_year}\n/g" >> ${temp_f}/${meas_filename}
+				#fi
+		
+			paste <(cut -f${germplasm_name_or_id} -d $'\t' ${temp_f}/germplasm_names.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/,/./g'|awk -v awk_cf=${conv_factor} '{print $1*awk_cf}'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${meas_date}\t${date_is_approximate}\t${team_id}\t${data_source_id}\t${meas_year}\n/g" >> ${temp_f}/${meas_filename}
+		
 		fi
 
 	done
@@ -4288,7 +4653,7 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 
 				printf "\n${red_color}PLEASE VIEW the ${temp_f}/${meas_type}_final_sort_errors.txt file.${normal_color}\nIf theses values are normal, or if they are not normal but you choose to correct them later:\n\tPress Y to accept them and continue\n\tPress N to stop\n\n"  
 				choice="-";while [  ! $(echo $choice|grep '[yn]') ];do printf "\r\t"; read -p "Continue [y/n]?" -n1 -s choice;done;printf "\n"
-				if [ $choice == "n" ]; then printf "${red_color}***ABORTING***${normal_color}\n";exit;fi
+				if [[ $choice == "n" ]]; then printf "${red_color}***ABORTING***${normal_color}\n";exit;fi
 			else
 				printf "none found.\n"
 			fi
@@ -4305,7 +4670,6 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 		echo
 		if [ ${verification_of_aberrant_meas} -eq 1 ]
 		then
-			#***TEAMCODE_ok_20150107***
 			grep '^#MV1' ${req_files_folder}/REQ_aberrant_meas_messages_utf.txt|cut -f2|perl -pe 's/'\''/'\'''\''/g' |perl -pe 's/^/\tINSERT INTO observations_on_sites(observation,temp_site_code,date, date_is_approximate, team_id,data_source_id,action) VALUES ('\''/g'|perl -pe "s/\n/"\'","\'"${site_code}"\'",now(),FALSE,fnct_get_team_from_employees("\'"Sébastien Clément"\'"),${data_source_id},"\'"Validation"\'");\n/g" > ${temp_f}/SQL_insert_observations_on_sites.txt
 			printf "\t${blue_color}NOTE: SQL commands to annotate those errors both at the measurements (tree_mensurations) and site (observations_on_sites) levels, into the database will appear in ${ready2import_tabs_folder}/SQL_insert_and_update2.txt${normal_color}\n"  
 
@@ -4378,7 +4742,7 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 		#	SLC30498_11_20902_2_0070_2002-09-15	57
 
 		#If this is the first measurement file, the filename to paste column into will be meas_base.txt (see example above), else meas_base+meas.txt
-		if [ $(head -1 ${temp_f}/unique_meas_filenames.txt) == $meas_file ]
+		if [[ $(head -1 ${temp_f}/unique_meas_filenames.txt) == $meas_file ]]
 		then
 			file2pasteinto="meas_base.txt"
 		else
@@ -4416,36 +4780,66 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 
 
 	#Remove lines where ALL measurements are NULL, and add headers
-	#***TEAMCODE_ok_20150108***
 	#25/5/2015: date ---> msmt_date, year ---> msmt_year
-	cat <(printf "temp_germplasm_name\tmsmt_date\tdate_is_approximate\tteam_id\tdata_source_id\tmsmt_year\t$(perl -pe 's/\.txt\n/\t/g' ${temp_f}/unique_meas_filenames.txt|perl -pe 's/\t$//g')\n") <(grep -v "${nulls_string}$" ${temp_f}/meas_base+meas.txt|cut -f1 --complement) > ${temp_f}/2import_tree_mensurations.txt
+	#2023-02-08: now uses either the temp_germplasm_name or germplasm_id as the first column header
+	cat <(printf "$(head -1 ${temp_f}/germplasm_names.txt|cut -f${germplasm_name_or_id} -d $'\t')\tmsmt_date\tdate_is_approximate\tteam_id\tdata_source_id\tmsmt_year\t$(perl -pe 's/\.txt\n/\t/g' ${temp_f}/unique_meas_filenames.txt|perl -pe 's/\t$//g')\n") <(grep -v "${nulls_string}$" ${temp_f}/meas_base+meas.txt|cut -f1 --complement) > ${temp_f}/2import_tree_mensurations.txt
 
 	printf "done\n"
 
 
+#exit
+
 #E. alternative_germplasm_names
-#TO BE REMADE COMPLETELY (8/1/2015)
+#TO BE REMADE COMPLETELY (8/1/2015) ---> updated 2023-02-09
 #1. TO ACCOMODATE NEW STRUCTURE (germplasm_name ---> germplasm_id)
 #2. ALSO:  the following fields ARE NO LONGER IN THE PARAMETERS:
 #	naming_team_code ---> Constant (does not change within a single column). Different than team responsible for measurements (changes with years), this one should be stable
+#		As of 2023-02-09, most names have no team id associated:
+#		select naming_team_id,employees,count(*) as nb_rows FROM germplasm_names gn
+#		left join v_grouped_employees_in_teams vgeit on gn.naming_team_id=vgeit.team_id
+#		group by 1,2 order by 1;
+#			naming_team_id	employees			nb_rows
+#			15				S�bastien Cl�ment	41937
+#			26				NULL			18
+#			28				NULL			224
+#			32				Patrick Lenz		3681
+#			39				Marie Deslauriers	1782
+#			41				NULL			1819
+#			45				NULL			18
+#			48				Roger Gagn�		2972
+#			53				Tessie Tong, Nelson Uy	1101
+#			88				Tessie Tong		163
+#			NULL			NULL			955699
+#		---> 2023-02-09: not required in germplasm_names and not often used in that table ---> DROPPED
 #	date_named 		---> Constant. Date should be the same as that of the earliest measurement columns. Only one date should apply to all alternative names, even if there are >1 alternive name columns.
-#	description		---> Constant. Can be "Nom d'arbre s�lectionn�", or others.
-#	refers_to		---> Constant. Usually NULL, could be a "Clone" name in some cases? TO BE VERIFIED..
-#	site_specificity	---> Constant. Usually NULL. Mostly for seedlots, not for trees.
-#	test_specificity	---> Constant. Usually NULL. Mostly for seedlots, not for trees.
-#	
+#						---> 2023-02-09: will put the date written above the TREE_ALT_NAME marker in the Excel file, since a date is required for that kind of marker.
+#	description		---> Constant. Can be "Nom d'arbre s�lectionn�", or others. See: select gn.description,count(*) as nb_rows FROM germplasm_names gn join germplasms g on gn.germplasm_id=g.id where g.type='Arbre' group by 1 order by 2 desc;
+#			---> 2023-02-09: will just set it to "Other name"
+#	refers_to		---> Constant. Usually NULL, could be a "Clone" name in some cases? 	---> 2023-02-09: not required in germplasm_names ---> DROPPED
+#	site_specificity	---> Constant. Usually NULL. Mostly for seedlots, not for trees.		---> 2023-02-09: not required in germplasm_names ---> DROPPED
+#	test_specificity	---> Constant. Usually NULL. Mostly for seedlots, not for trees.		---> 2023-02-09: not required in germplasm_names ---> DROPPED
+#
+#	We will add the naming_organization_code column and set it to either 'cfs' or 'MFFP' depending on the origin of data.
+#	As of 2023-02-09, naming_organization_code is in majority (80% of cases) set to cfs_lfc. See: select naming_organization_code,count(*) FROM germplasm_names group by 1 order by 2 desc;
+#
+#2023-02-09:
+#The following values will be inserted by default:
+name_description="Other name"
+naming_organization_code="cfs"
+is_a_ref_name="f"
+
 #Only this field remains in the parameters, as it is also used to give the reference names (e.g. E560A3_01_01234_03_05678_00) earlier in the script
 #	naming_organization_code
 #----------------------------------------------------------------
-	printf "alternative_germplasm_names..."
+	printf "Other tree names..."
 
-	alt_name_filename="tree_alt_name.txt"
-	printf "" > ${temp_f}/${alt_name_filename}
 
-	for infile_column in $(awk -F "\t" '{print $3"\t"$1}' ${temp_f}/all_headers.txt|grep '^TREE_ALT_NAME[[:space:]]')
+	printf "" > ${temp_f}/tree_alt_name.txt
+	#Cycle through all column with TREE_ALT_NAME in the submitted file
+	for infile_column in $(awk -F "\t" '{print $3"\t"$1"\t"$4}' ${temp_f}/all_headers.txt|grep '^TREE_ALT_NAME[[:space:]]')
 	do
 		col_no=$(echo $infile_column|cut -f2)	#Read column number (applies to cleaned_infile2.txt)
-		
+		naming_date=$(echo $infile_column|cut -f3)
 
 	#Clean the column:
 		#If the measurement file doesn't exist, create it. Otherwise, append to it
@@ -4457,22 +4851,104 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 					#2. replace 0s/empties with NULLs.
 			#(...)
 		#NOTE: could use the fnct_clean_values function instead of cleaning here directly
-		if [ ! -e ${temp_f}/${alt_name_filename} ]
+		if [ ! -e ${temp_f}/tree_alt_name.txt ]
 		then
-			#***TEAMCODE_TO_BE_FIXED***
-			paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${description}\t${refers_to}\t${date_named}\t${naming_team_code}\t${naming_organization_code}\t${site_specificity}\t${test_specificity}\t${data_source_id}\n/g" > ${temp_f}/${alt_name_filename}
+			#line before 2023-02-08: paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${description}\t${refers_to}\t${date_named}\t${naming_team_code}\t${naming_organization_code}\t${site_specificity}\t${test_specificity}\t${data_source_id}\n/g" > ${temp_f}/${alt_name_filename}
+			paste <(cut -f${germplasm_name_or_id} -d $'\t' ${temp_f}/germplasm_names.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${name_description}\t${naming_date}\t${naming_organization_code}\t${is_a_ref_name}\t${data_source_id}\n/g" > ${temp_f}/tree_alt_name.txt
+			#cut -f${germplasm_name_or_id} -d $'\t' ${temp_f}/germplasm_names.txt|tail -n+2
+			
 		else
-			paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${description}\t${refers_to}\t${date_named}\t${naming_team_code}\t${naming_organization_code}\t${site_specificity}\t${test_specificity}\t${data_source_id}\n/g" >> ${temp_f}/${alt_name_filename}
+			#Line before 2023-02-08: paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${description}\t${refers_to}\t${date_named}\t${naming_team_code}\t${naming_organization_code}\t${site_specificity}\t${test_specificity}\t${data_source_id}\n/g" >> ${temp_f}/${alt_name_filename}
+			paste <(cut -f${germplasm_name_or_id} -d $'\t' ${temp_f}/germplasm_names.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/(^0$|^$)/NULL/g') |perl -pe "s/\n/\t${name_description}\t${naming_date}\t${naming_organization_code}\t${is_a_ref_name}\t${data_source_id}\n/g" >> ${temp_f}/tree_alt_name.txt
 		fi
-		
 	done
+	
+	#echo
+	#echo "Alternative names, including empty lines (first 10 lines)"
+	#head ${temp_f}/tree_alt_name.txt
+	#echo
+	
+	#Remove lines with NULL names
+	awk -F "\t" '{if ($2 != "NULL") print}' ${temp_f}/tree_alt_name.txt > ${temp_f}/tree_alt_name_temp.txt
+	mv ${temp_f}/tree_alt_name_temp.txt ${temp_f}/tree_alt_name.txt
+	
+	#817173  papoua  Other name      2015-02-03      cfs     f       625
+	#817173  papoua  Other name      2017-09-27      cfs     f       625
+	#817174  dssss   Other name      2015-02-03      cfs     f       625
+	#817175  poet    Other name      2017-09-27      cfs     f       625
+	#817176  234     Other name      2015-02-03      cfs     f       625
+	#817178  cricri  Other name      2017-09-27      cfs     f       625
+	#817178  rs22    Other name      2015-02-03      cfs     f       625
+	#817180  woud    Other name      2017-09-27      cfs     f       625
+	#817199  grouar  Other name      2017-09-27      cfs     f       625
 
-	#clean the file (remove alternative names of NULL value) and add headers
-	#***TEAMCODE_TO_BE_FIXED***
-	cat <(printf "germplasm_name\talternative_name\tdescription\trefers_to\tdate_named\tnaming_team_code\tnaming_organization_code\tsite_specificity\ttest_specificity\tdata_source_id\n") <(awk -F "\t" '{if ($2 != "NULL") print}' ${temp_f}/${alt_name_filename}) > ${temp_f}/2import_alternative_germplasm_names.txt
+	#echo "Alternative names, excluding empty lines:"
+	#cat ${temp_f}/tree_alt_name.txt
+	#echo
+	
+	#Check for replicated names and descriptions for any germplasm
+	cut -f1,2,3 -d $'\t' ${temp_f}/tree_alt_name.txt|sort|uniq -d > ${temp_f}/tree_alt_names_rep.txt
+	#Will be either
+	#E60A_01_00002_01	papoua	Other name
+	#or
+	#817173	papoua	Other name
+	
+	#echo "Replicated names (ids OR names)"
+	#cat ${temp_f}/tree_alt_names_rep.txt
+	#echo
+	
+	#If it is an id instead of a name, add the name column
+	if [ ${germplasm_name_or_id} -eq 2 ]
+	then
+		join -t $'\t'  <(awk -F "\t" '{print $2"\t"$1}' ${temp_f}/germplasm_names.txt|sort -k1,1) <(sort -k1,1 ${temp_f}/tree_alt_names_rep.txt)|cut -f1 -d $'\t' --complement > ${temp_f}/tree_alt_names_rep_temp.txt
+		mv ${temp_f}/tree_alt_names_rep_temp.txt ${temp_f}/tree_alt_names_rep.txt
+	fi
+	#E60A_01_00002_01        papoua  Other name
+	
+	#echo "Replicated names (names only)"
+	#cat ${temp_f}/tree_alt_names_rep.txt
+	#echo
+	
+	
+	
+	#If there are duplicates, warn but continue, and remove duplicates.
+	if [ $(cat ${temp_f}/tree_alt_names_rep.txt|wc -l) -gt 0 ]
+	then 
+		#Warn
+		printf "\n${red_color}WARNING: Some alternative names are repeated for the same tree.\n\n"
+		perl -pe 's/^/\t/g' ${temp_f}/tree_alt_names_rep.txt
+		printf "\nDuplicates will be removed${normal_color}.\n\n"
+	
+		#Remove duplicates, based on first 3 columns.
+		
+		#For test only
+			#echo "Before removing duplicates:"
+			#sort ${temp_f}/tree_alt_name.txt
+			#echo
+			#echo "After removing duplicates:"
+			#sort -u -k1,1 -k2,2 -k3,3 -t $'\t' ${temp_f}/tree_alt_name.txt
+			#echo
+		
+		sort -u -k1,1 -k2,2 -k3,3 -t $'\t' ${temp_f}/tree_alt_name.txt > ${temp_f}/tree_alt_name_temp.txt
+		mv ${temp_f}/tree_alt_name_temp.txt ${temp_f}/tree_alt_name.txt
+	
+	fi
+
+
+	#add headers
+	#Line before 2023-02-08: cat <(printf "germplasm_name\talternative_name\tdescription\trefers_to\tdate_named\tnaming_team_code\tnaming_organization_code\tsite_specificity\ttest_specificity\tdata_source_id\n") <(awk -F "\t" '{if ($2 != "NULL") print}' ${temp_f}/${alt_name_filename}) > ${temp_f}/2import_germplasm_names.txt
+	cat <(printf "$(head -1 ${temp_f}/germplasm_names.txt|cut -f${germplasm_name_or_id} -d $'\t')\tname\tdescription\tdate_named\tnaming_organization_code\tis_a_reference_name\tdata_source_id\n") ${temp_f}/tree_alt_name.txt > ${temp_f}/2import_germplasm_names.txt
+
+	#echo "Final file:"
+	#cat ${temp_f}/2import_germplasm_names.txt
+
 
 	printf "done\n"
-	
+
+
+
+#exit
+
 	
 #F. comments_on_germplasms
 #----------------------------------------------------------------
@@ -4503,19 +4979,27 @@ if [ ${create_tabs_despite_additional_data} -eq 1 ];then additional_data=0;fi
 		#NOTE: could use the fnct_clean_values function instead of cleaning here directly
 		if [ ! -e ${temp_f}/${comments_filename} ]
 		then
-			#***TEAMCODE_ok_20150108***
-			paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/^$/NULL/g') |perl -pe "s/\n/\t${comment_date}\t${date_is_approximate}\t${context}\t${team_id}\t${data_source_id}\n/g" > ${temp_f}/${comments_filename}
+			#Line before 2023-02-08: paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/^$/NULL/g') |perl -pe "s/\n/\t${comment_date}\t${date_is_approximate}\t${context}\t${team_id}\t${data_source_id}\n/g" > ${temp_f}/${comments_filename}
+			#Line before 2023-02-13: paste <(cut -f${germplasm_name_or_id} -d $'\t' ${temp_f}/germplasm_names.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/^$/NULL/g') |perl -pe "s/\n/\t${comment_date}\t${date_is_approximate}\t${context}\t${team_id}\t${data_source_id}\n/g" > ${temp_f}/${comments_filename}
+			paste <(cut -f${germplasm_name_or_id} -d $'\t' ${temp_f}/germplasm_names.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/^$/NULL/g') |perl -pe "s/\n/\t${comment_date}\t${date_is_approximate}\t${context_id}\t${team_id}\t${data_source_id}\n/g" > ${temp_f}/${comments_filename}
+		
+		
 		else
-			paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/^$/NULL/g') |perl -pe "s/\n/\t${comment_date}\t${date_is_approximate}\t${context}\t${team_id}\t${data_source_id}\n/g" >> ${temp_f}/${comments_filename}
+			#Line before 2023-02-08: paste <(cut -f${germplasm_name_col} ${temp_f}/cleaned_infile2.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/^$/NULL/g') |perl -pe "s/\n/\t${comment_date}\t${date_is_approximate}\t${context}\t${team_id}\t${data_source_id}\n/g" >> ${temp_f}/${comments_filename}
+			#Line before 2023-02-13: paste <(cut -f${germplasm_name_or_id} -d $'\t' ${temp_f}/germplasm_names.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/^$/NULL/g') |perl -pe "s/\n/\t${comment_date}\t${date_is_approximate}\t${context}\t${team_id}\t${data_source_id}\n/g" >> ${temp_f}/${comments_filename}
+			paste <(cut -f${germplasm_name_or_id} -d $'\t' ${temp_f}/germplasm_names.txt|tail -n+2) <(cut -f${col_no} ${temp_f}/cleaned_infile2.txt|tail -n+2|perl -pe 's/^ +//g'|perl -pe 's/ +$//g'|perl -pe 's/^$/NULL/g') |perl -pe "s/\n/\t${comment_date}\t${date_is_approximate}\t${context_id}\t${team_id}\t${data_source_id}\n/g" >> ${temp_f}/${comments_filename}
 		fi
 		
 	done
 
 	#clean the file (remove alternative names of NULL value) and add headers
-	#***TEAMCODE_ok_20150108***
-	cat <(printf "temp_germplasm_name\tcomment\tdate\tdate_is_approximate\tcontext\tteam_id\tdata_source_id\n") <(awk -F "\t" '{if ($2 != "NULL") print}' ${temp_f}/${comments_filename}) > ${temp_f}/2import_comments_on_germplasms.txt
+	#2023-02-09:
+	#Line before 2023-02-13: cat <(printf "$(head -1 ${temp_f}/germplasm_names.txt|cut -f${germplasm_name_or_id} -d $'\t')\tcomment\tdate\tdate_is_approximate\tcontext\tteam_id\tdata_source_id\n") <(awk -F "\t" '{if ($2 != "NULL") print}' ${temp_f}/${comments_filename}) > ${temp_f}/2import_comments_on_germplasms.txt
+	cat <(printf "$(head -1 ${temp_f}/germplasm_names.txt|cut -f${germplasm_name_or_id} -d $'\t')\tcomment\tdate\tdate_is_approximate\tcontext_id\tteam_id\tdata_source_id\n") <(awk -F "\t" '{if ($2 != "NULL") print}' ${temp_f}/${comments_filename}) > ${temp_f}/2import_comments_on_germplasms.txt
 
 	printf "done\n"
+
+#exit
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------
 #24. SHOWING SUBSTITUTIONS JOURNAL
@@ -4540,9 +5024,9 @@ echo "------------------------------------------"
 	#Cycle through each of the tabulated files listed in REQ_final_tabs_creation_parameters.txt
 	for tab_file in $(cat ${req_files_folder}/REQ_final_tabs_creation_parameters.txt|grep -vE '^#|^$')
 	do
-		tab_infile=$(echo ${tab_file}|cut -f1)
-		destination_table=$(echo ${tab_file}|cut -f2)
-		pos=$(echo ${tab_file}|cut -f3)
+		tab_infile=$(echo ${tab_file}|cut -f1)				#The name of the tabulated file created in section 23 above
+		destination_table=$(echo ${tab_file}|cut -f2)		#Name of the destination table in TreeSource
+		pos=$(echo ${tab_file}|cut -f3)					#logical order for execution of insert scripts
 		outfile="2insert_${pos}_${destination_table}_utf.txt"
 		
 
@@ -4570,7 +5054,7 @@ echo "------------------------------------------"
 				#fnct_convert_to_utf8 tempA.txt ${outfile}
 			
 			#Prepare import command to be run by cleseb user:
-			grep "^${first_field_name}" ${temp_f}/${tab_infile}|perl -pe 's/ //g'|perl -pe 's/\t/,/g'|awk -v awk_outfilename=${outfile} -v awk_destination_table=${destination_table} '{print "psql -U cleseb -h \"132.156.208.30\" -d ts_d -c \"\\copy "awk_destination_table" ("$1") FROM '\''"awk_outfilename"'\''\""}' >> ${ready2import_tabs_folder}/${psql_commands_file}
+			grep "^${first_field_name}" ${temp_f}/${tab_infile}|perl -pe 's/ //g'|perl -pe 's/\t/,/g'|awk -v awk_outfilename=${outfile} -v awk_destination_table=${destination_table} '{print "psql -U cleseb -h \"132.156.208.78\" -d ts_d -c \"\\copy "awk_destination_table" ("$1") FROM '\''"awk_outfilename"'\''\""}' >> ${ready2import_tabs_folder}/${psql_commands_file}
 			#Prepare the same command to be run by xtraksites user:
 			#Note: from 10/2/2015 on, also include the table name and tabulated filename in front of the psql command, separated from the latter by a tab. This will serve when executing the command later to grab table name more easily
 				#Line before 10/2/2015: grep "^${first_field_name}" ${temp_f}/${tab_infile}|perl -pe 's/ //g'|perl -pe 's/\t/,/g'|awk -v awk_outfilename=${outfile} -v awk_destination_table=${destination_table} '{print "psql -d ___DATABASE___ -c \"\\copy "awk_destination_table" ("$1") FROM '\''___TABS_FOLDER___"awk_outfilename"'\''\""}' >> ${temp_f}/psql_commands_2insert_DEV_AUTO.txt
@@ -4604,7 +5088,6 @@ echo "------------------------------------------"
 	rm field_list.txt
 	
 
-#exit
 
 ####################################################################
 #############################SKIP_TAG#################################
@@ -4697,7 +5180,7 @@ echo "------------------------------------------"
 	echo
 	#If insertion into ts_d was chosen
 	#If not, will simply skip this section
-	if [ ${auto_insert_dev_choice} == "Y" ]
+	if [[ ${auto_insert_dev_choice} == "Y" ]]
 	then
 		#disable_trigger ts_d germplasms_on_sites trg_germplasms_on_sites_03
 			#13/1/2015: No disabling necessary now, because that trigger lauches proc_set_updated_site_or_container_to_1(), which doesn't take time to execute.
@@ -4713,7 +5196,7 @@ echo "------------------------------------------"
 	echo
 	#If insertion into ts_d was chosen
 	#If not, will simply skip this section
-	if [ ${auto_insert_prod_choice} == "Y" ]
+	if [[ ${auto_insert_prod_choice} == "Y" ]]
 	then
 		#disable_trigger ts_pi germplasms_on_sites trg_germplasms_on_sites_03
 			#13/1/2015: No disabling necessary now, because that trigger lauches proc_set_updated_site_or_container_to_1(), which doesn't take time to execute.
@@ -4750,7 +5233,7 @@ echo
 printf "${green_color}SCRIPT COMPLETED!${normal_color}\n"
 echo
 
-if [ ${auto_insert_prod_choice} == "n" ]
+if [[ ${auto_insert_prod_choice} == "n" ]]
 then
 	printf "${red_color}If not already done:\n--------------------------------\n"
 	printf "1. REVIEW AND EXECUTE THE SCRIPT ${ready2import_tabs_folder}/SQL_insert_and_update1.txt before inserting other data.\n"
